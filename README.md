@@ -1,5 +1,11 @@
 # 云志选 - 2026云南高考志愿智能决策系统
 
+![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)
+![React](https://img.shields.io/badge/React-18-61DAFB.svg)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688.svg)
+![License](https://img.shields.io/badge/License-MIT-green.svg)
+![Last Commit](https://img.shields.io/github/last-commit/Royelau76/gaokao-decision-system.svg)
+
 ## 项目简介
 基于Web的2026年云南省高考志愿填报决策支持系统。
 
