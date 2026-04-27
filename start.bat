@@ -7,82 +7,39 @@ echo ========================================
 echo.
 
 REM --- Kill existing processes on ports ---
-echo [INFO] Checking port usage...
+echo [1/5] Checking port usage...
 powershell -NoProfile -Command "netstat -ano|Select-String ':8000.*LISTENING'|ForEach-Object{stop-process -id ((-split$_)[-1]) -force -erroraction silentlycontinue}" 2>nul
 powershell -NoProfile -Command "netstat -ano|Select-String ':3000.*LISTENING'|ForEach-Object{stop-process -id ((-split$_)[-1]) -force -erroraction silentlycontinue}" 2>nul
-echo [OK] Ports cleared
-echo.
+echo       Done.
 
-REM --- Check Python ---
-where python >nul 2>&1
-if %ERRORLEVEL% neq 0 (
-    echo [FAIL] Python not found
-    pause
-    exit /b 1
-)
-echo [OK] Python found
-
-REM --- Install backend dependencies ---
-echo [INFO] Checking backend dependencies...
-python -c "import fastapi, uvicorn, pydantic" 2>nul
-if %ERRORLEVEL% equ 0 (
-    echo [OK] Backend dependencies already installed
-) else (
-    echo [INFO] Installing backend dependencies...
-    pip install -r backend\requirements.txt
-    echo [OK] Backend dependencies installed
-)
-echo.
+REM --- Check Python & dependencies ---
+echo [2/5] Checking Python...
+where python >nul 2>&1 || (echo Python not found && pause && exit /b 1)
+python -c "import fastapi,uvicorn,pydantic" 2>nul || pip install -r backend\requirements.txt
+echo       Done.
 
 REM --- Start backend ---
-echo [INFO] Starting backend on http://localhost:8000 ...
-start "Backend" /MIN cmd /c "cd /d %~dp0backend && python main.py"
-echo [OK] Backend starting...
+echo [3/5] Starting backend...
+start "YunZhiXuan-Backend" cmd /k "title 云志选-后端 %~dp0backend && python main.py"
+echo       Backend: http://localhost:8000
 
-REM --- Check Node.js ---
-where node >nul 2>&1
-if %ERRORLEVEL% neq 0 (
-    echo [WARN] Node.js not found, skipping frontend
-    echo       Backend: http://localhost:8000
-    pause
-    exit /b 0
-)
-echo [OK] Node.js found
-
-REM --- Install frontend dependencies ---
-if not exist "frontend\node_modules" (
-    echo [INFO] Installing frontend dependencies (npm install --legacy-peer-deps) ...
-    cd frontend
-    call npm install --legacy-peer-deps
-    cd ..
-)
-echo [OK] Frontend dependencies ready
-echo.
+REM --- Check Node.js & dependencies ---
+echo [4/5] Checking Node.js...
+where node >nul 2>&1 || (echo Node.js not found, backend only && pause && exit /b 0)
+if not exist "frontend\node_modules" (cd frontend && call npm install --legacy-peer-deps && cd ..)
+echo       Done.
 
 REM --- Start frontend ---
-echo [INFO] Starting frontend on http://localhost:3000 ...
-start "Frontend" /MIN cmd /c "cd /d %~dp0frontend && npm start"
-echo [OK] Frontend starting...
+echo [5/5] Starting frontend...
+start "YunZhiXuan-Frontend" cmd /k "title 云志选-前端 && cd /d %~dp0frontend && set BROWSER=none && npm start"
+echo       Frontend: http://localhost:3000
 
-REM --- Wait for services to be ready ---
+REM --- Wait and open browser ---
 echo.
-echo [INFO] Waiting for services to start...
-echo        (this may take 30-60 seconds on first run)
-:wait_backend
-timeout /t 3 /nobreak >nul
-powershell -NoProfile -Command "try{$r=Invoke-WebRequest -Uri http://localhost:8000 -TimeoutSec 2 -UseBasicParsing;exit 0}catch{exit 1}" 2>nul
-if %ERRORLEVEL% neq 0 goto wait_backend
-echo [OK] Backend ready
-
-:wait_frontend
-timeout /t 3 /nobreak >nul
-powershell -NoProfile -Command "try{$r=Invoke-WebRequest -Uri http://localhost:3000 -TimeoutSec 2 -UseBasicParsing;exit 0}catch{exit 1}" 2>nul
-if %ERRORLEVEL% neq 0 goto wait_frontend
-echo [OK] Frontend ready
-
-REM --- Open browser ---
+echo Waiting for services to start (about 30s)...
 echo.
-echo [INFO] Opening browser...
+timeout /t 25 /nobreak >nul
+echo Opening browser...
 start http://localhost:3000
 
 echo.
@@ -90,9 +47,7 @@ echo ========================================
 echo   System Ready!
 echo   Frontend : http://localhost:3000
 echo   Backend  : http://localhost:8000
-echo   API Docs : http://localhost:8000/docs
 echo ========================================
 echo.
-echo Backend/Frontend running in minimized windows.
-echo Close them from taskbar to stop the system.
+echo Close the Backend/Frontend windows to stop.
 pause
