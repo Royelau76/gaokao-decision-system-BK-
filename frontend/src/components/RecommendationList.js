@@ -18,7 +18,7 @@ const RecommendationList = ({ recommendations, onGenerateVolunteerTable }) => {
     },
     {
       title: '院校',
-      dataIndex: ['university', 'name'],
+      dataIndex: 'university_name',
       key: 'university'
     },
     {

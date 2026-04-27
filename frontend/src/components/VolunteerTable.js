@@ -6,7 +6,7 @@ const VolunteerTable = ({ studentInfo, recommendations }) => {
     key: index,
     order: index + 1,
     level: rec.level,
-    university: rec.university.name,
+    university: rec.university_name,
     major: rec.major,
     probability: rec.admission_probability,
     reason: generateReason(rec)

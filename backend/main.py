@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -7,15 +8,27 @@ import json
 import os
 from datetime import datetime
 
+from db import get_db_path, get_connection
+
 # 导入云南物理类招生数据 API
 from yunnan_physics_api import router as yunnan_physics_router
 from yunnan_score_segments_api import router as yunnan_segments_router
 from yunnan_b_segment_api import router as yunnan_b_segment_router
+from query_api import router as query_router
+from data_entry_api import router as data_entry_router
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_database()
+    yield
+
 
 app = FastAPI(
     title="云志选 - 云南高考志愿决策系统",
     description="2026年云南省高考志愿填报智能决策支持系统",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # 配置CORS
@@ -31,6 +44,8 @@ app.add_middleware(
 app.include_router(yunnan_physics_router)
 app.include_router(yunnan_segments_router)
 app.include_router(yunnan_b_segment_router)
+app.include_router(query_router)
+app.include_router(data_entry_router)
 
 # 数据模型
 class StudentInfo(BaseModel):
@@ -56,10 +71,17 @@ class University(BaseModel):
 class RecommendationResult(BaseModel):
     """推荐结果"""
     level: str                    # 冲/稳/保
-    university: University
-    major: str
+    university_name: str          # 院校名称
+    university_id: str            # 院校ID
+    major: str                    # 专业
+    major_code: str = ""          # 专业代码
+    min_score: float = 0          # 最低分
+    max_score: Optional[float] = None
+    avg_score: Optional[float] = None
+    enrollment_count: Optional[int] = None
     admission_probability: float  # 录取概率
-    suggested_order: int         # 建议排序
+    suggested_order: int          # 建议排序
+    school_level: str = ""        # 院校层次
 
 class VolunteerPlan(BaseModel):
     """志愿方案"""
@@ -69,58 +91,140 @@ class VolunteerPlan(BaseModel):
     recommendations: List[RecommendationResult]
     created_at: datetime
 
-# 初始化数据库
-@app.on_event("startup")
-async def startup_event():
-    init_database()
-
 def init_database():
-    """初始化SQLite数据库"""
-    # 获取项目根目录
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    db_path = os.path.join(base_dir, 'data', 'gaokao.db')
-    
-    conn = sqlite3.connect(db_path)
+    """初始化SQLite数据库 - 创建所有需要的表"""
+    conn = sqlite3.connect(get_db_path())
     cursor = conn.cursor()
-    
-    # 创建院校表
+
+    # 院校表
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS universities (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         province TEXT,
+        city TEXT,
         level TEXT,
         admission_mode TEXT,
+        website TEXT,
         min_score_2025 INTEGER,
         min_rank_2025 INTEGER,
-        majors TEXT  -- JSON格式存储
+        subjects_required TEXT,
+        majors TEXT,
+        advantages TEXT,
+        disadvantages TEXT
     )
     ''')
-    
-    # 创建考生信息表
+
+    # 考生信息表
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS students (
         id TEXT PRIMARY KEY,
         score INTEGER,
         rank INTEGER,
-        subjects TEXT,  -- JSON格式
+        subjects TEXT,
         preference_region TEXT,
         preference_major TEXT,
         risk_tolerance TEXT
     )
     ''')
-    
-    # 创建志愿方案表
+
+    # 志愿方案表
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS volunteer_plans (
         id TEXT PRIMARY KEY,
         name TEXT,
         student_id TEXT,
-        recommendations TEXT,  -- JSON格式
+        recommendations TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     ''')
-    
+
+    # 云南物理类招生分数线表
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS yunnan_physics_scores (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        university_id TEXT NOT NULL,
+        university_name TEXT NOT NULL,
+        year INTEGER NOT NULL,
+        major_category TEXT NOT NULL,
+        major_code TEXT,
+        enrollment_count INTEGER,
+        max_score INTEGER,
+        min_score INTEGER NOT NULL,
+        avg_score INTEGER,
+        min_rank INTEGER,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(year, university_id, major_category)
+    )
+    ''')
+
+    # 一分一段表
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS yunnan_physics_score_segments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        year INTEGER NOT NULL,
+        score INTEGER NOT NULL,
+        count INTEGER NOT NULL,
+        cumulative_count INTEGER NOT NULL,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        data_source TEXT,
+        UNIQUE(year, score)
+    )
+    ''')
+
+    # 本科批B段招生计划表
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS yunnan_b_segment_plans (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        year INTEGER NOT NULL,
+        university_id TEXT NOT NULL,
+        university_name TEXT NOT NULL,
+        major_group_code TEXT NOT NULL,
+        major_group_name TEXT,
+        required_subjects TEXT,
+        major_category TEXT NOT NULL,
+        included_majors TEXT,
+        tuition INTEGER,
+        enrollment_count INTEGER,
+        campus TEXT,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        data_source TEXT,
+        UNIQUE(year, university_id, major_group_code, major_category)
+    )
+    ''')
+
+    # 招生分数线主表
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS admission_scores (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        university_id TEXT NOT NULL,
+        university_name TEXT,
+        year INTEGER NOT NULL,
+        province TEXT NOT NULL,
+        subject_type TEXT NOT NULL,
+        admission_batch TEXT,
+        major_category TEXT,
+        major_name TEXT,
+        enrollment_count INTEGER,
+        max_score INTEGER,
+        min_score INTEGER,
+        avg_score INTEGER,
+        max_rank INTEGER,
+        min_rank INTEGER,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        data_source TEXT,
+        UNIQUE(year, province, subject_type, university_id, major_category)
+    )
+    ''')
+
     conn.commit()
     conn.close()
 
@@ -136,10 +240,7 @@ async def get_universities(
     limit: int = 100
 ):
     """获取院校列表"""
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    db_path = os.path.join(base_dir, 'data', 'gaokao.db')
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
+    conn = get_connection()
     cursor = conn.cursor()
     
     query = "SELECT * FROM universities WHERE 1=1"
@@ -191,9 +292,7 @@ async def get_recommendations(student: StudentInfo):
 @app.post("/api/volunteer-plans")
 async def create_volunteer_plan(plan: VolunteerPlan):
     """创建志愿方案"""
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    db_path = os.path.join(base_dir, 'data', 'gaokao.db')
-    conn = sqlite3.connect(db_path)
+    conn = get_connection()
     cursor = conn.cursor()
     
     cursor.execute('''
@@ -202,8 +301,8 @@ async def create_volunteer_plan(plan: VolunteerPlan):
     ''', (
         plan.id,
         plan.name,
-        plan.student_info.dict(),
-        json.dumps([r.dict() for r in plan.recommendations])
+        json.dumps(plan.student_info.model_dump()),
+        json.dumps([r.model_dump() for r in plan.recommendations])
     ))
     
     conn.commit()
@@ -251,13 +350,7 @@ def calculate_recommendations(student: StudentInfo) -> List[RecommendationResult
         bao_score_min = score - 15
     
     # 查询数据库
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    db_path = os.path.join(base_dir, 'backend', 'data', 'gaokao.db')
-    # 如果上面的路径不存在，尝试当前目录下的data
-    if not os.path.exists(db_path):
-        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'gaokao.db')
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
+    conn = get_connection()
     cursor = conn.cursor()
     
     # 冲：分数略高于考生（按专业粒度）

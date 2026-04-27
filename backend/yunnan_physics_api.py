@@ -6,7 +6,8 @@ from typing import List, Optional
 from pydantic import BaseModel
 import sqlite3
 import json
-import os
+
+from db import get_connection
 
 router = APIRouter(prefix="/api/yunnan", tags=["云南物理类招生数据"])
 
@@ -18,13 +19,13 @@ class AdmissionScore(BaseModel):
     university_name: str
     year: int
     major_category: str
-    major_code: Optional[str]
-    enrollment_count: Optional[int]
-    max_score: Optional[int]
-    min_score: int
-    avg_score: Optional[int]
-    min_rank: Optional[int]
-    notes: Optional[str]
+    major_code: Optional[str] = None
+    enrollment_count: Optional[int] = None
+    max_score: Optional[float] = None
+    min_score: float
+    avg_score: Optional[float] = None
+    min_rank: Optional[int] = None
+    notes: Optional[str] = None
 
 class ScoreQueryParams(BaseModel):
     """查询参数"""
@@ -33,12 +34,6 @@ class ScoreQueryParams(BaseModel):
     max_score: Optional[int] = None               # 最高分上限
     university_id: Optional[str] = None           # 学校ID
     major_category: Optional[str] = None          # 专业大类
-
-# 数据库连接辅助函数
-def get_db_connection():
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    db_path = os.path.join(base_dir, 'data', 'gaokao.db')
-    return sqlite3.connect(db_path)
 
 # API 接口 1: 获取所有招生分数线数据
 @router.get("/scores", response_model=List[AdmissionScore])
@@ -57,7 +52,7 @@ async def get_admission_scores(
     - /api/yunnan/scores?university_id=beida
     - /api/yunnan/scores?min_score=700&max_score=720
     """
-    conn = get_db_connection()
+    conn = get_connection()
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
@@ -104,7 +99,7 @@ async def recommend_universities(score: int, rank: Optional[int] = None, year: i
     - 稳: 分数匹配的学校（±5分）
     - 保: 分数有把握的学校（-5分以下）
     """
-    conn = get_db_connection()
+    conn = get_connection()
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
@@ -151,7 +146,7 @@ async def get_university_detail(university_id: str, year: int = 2024):
     """
     获取某学校在云南物理类的所有招生专业详情
     """
-    conn = get_db_connection()
+    conn = get_connection()
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
@@ -185,7 +180,7 @@ async def get_statistics(year: int = 2024):
     """
     获取云南省物理类招生数据统计
     """
-    conn = get_db_connection()
+    conn = get_connection()
     cursor = conn.cursor()
     
     # 统计信息

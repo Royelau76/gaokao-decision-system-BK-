@@ -4,9 +4,9 @@
 from fastapi import APIRouter, HTTPException
 from typing import List, Optional
 from pydantic import BaseModel
-import sqlite3
 import json
-import os
+
+from db import get_connection
 
 router = APIRouter(prefix="/api/yunnan/b-segment", tags=["云南物理类本科批B段"])
 
@@ -17,24 +17,16 @@ class BSegmentPlan(BaseModel):
     year: int
     university_id: str
     university_name: str
-    major_group_sequence: Optional[str]    # 专业组序号
     major_code: str                        # 专业代号
-    major_group_name: Optional[str]
-    required_subjects: Optional[str]
+    major_group_sequence: Optional[str] = None  # 专业组序号
+    major_group_name: Optional[str] = None
+    required_subjects: Optional[str] = None
     major_category: str
-    included_majors: Optional[str]
-    tuition: Optional[int]
+    included_majors: Optional[str] = None
+    tuition: Optional[int] = None
     enrollment_count: int
-    campus: Optional[str]
-    notes: Optional[str]
-
-# 数据库连接辅助函数
-def get_db_connection():
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    db_path = os.path.join(base_dir, 'data', 'gaokao.db')
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    return conn
+    campus: Optional[str] = None
+    notes: Optional[str] = None
 
 # API 接口 1: 获取某年某校的B段招生计划
 @router.get("/plans/{year}/{university_id}", response_model=List[BSegmentPlan])
@@ -45,11 +37,11 @@ async def get_b_segment_plans(year: int, university_id: str):
     示例:
     - /api/yunnan/b-segment/plans/2025/beida
     """
-    conn = get_db_connection()
+    conn = get_connection()
     cursor = conn.cursor()
     
     cursor.execute('''
-        SELECT * FROM yunnan_b_segment_plans 
+        SELECT * FROM yunnan_b_segment_plans
         WHERE year = ? AND university_id = ?
         ORDER BY major_code
     ''', (year, university_id))
@@ -72,7 +64,7 @@ async def get_plans_by_subject(year: int, subject: str, university_id: Optional[
     - /api/yunnan/b-segment/plans/by-subject/2025?subject=化学
     - /api/yunnan/b-segment/plans/by-subject/2025?subject=化学&university_id=beida
     """
-    conn = get_db_connection()
+    conn = get_connection()
     cursor = conn.cursor()
     
     query = '''
@@ -93,20 +85,20 @@ async def get_plans_by_subject(year: int, subject: str, university_id: Optional[
     
     return [dict(row) for row in rows]
 
-# API 接口 3: 按专业代号查询
+# API 接口 3: 按专业组代码查询
 @router.get("/plans/by-code/{year}/{university_id}/{major_code}")
 async def get_plan_by_code(year: int, university_id: str, major_code: str):
     """
-    查询具体专业代号的B段招生计划
-    
+    查询具体专业组代码的B段招生计划
+
     示例:
     - /api/yunnan/b-segment/plans/by-code/2025/beida/01
     """
-    conn = get_db_connection()
+    conn = get_connection()
     cursor = conn.cursor()
-    
+
     cursor.execute('''
-        SELECT * FROM yunnan_b_segment_plans 
+        SELECT * FROM yunnan_b_segment_plans
         WHERE year = ? AND university_id = ? AND major_code = ?
     ''', (year, university_id, major_code))
     
@@ -127,7 +119,7 @@ async def get_b_segment_universities(year: int):
     示例:
     - /api/yunnan/b-segment/universities/2025
     """
-    conn = get_db_connection()
+    conn = get_connection()
     cursor = conn.cursor()
     
     cursor.execute('''
@@ -157,7 +149,7 @@ async def get_b_segment_stats(year: int):
     示例:
     - /api/yunnan/b-segment/stats/2025
     """
-    conn = get_db_connection()
+    conn = get_connection()
     cursor = conn.cursor()
     
     # 总体统计

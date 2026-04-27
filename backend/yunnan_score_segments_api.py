@@ -4,8 +4,8 @@
 from fastapi import APIRouter, HTTPException
 from typing import List, Optional
 from pydantic import BaseModel
-import sqlite3
-import os
+
+from db import get_connection
 
 router = APIRouter(prefix="/api/yunnan/segments", tags=["云南物理类一分一段"])
 
@@ -27,14 +27,6 @@ class RankQueryResult(BaseModel):
     same_score_count: int
     message: str
 
-# 数据库连接辅助函数
-def get_db_connection():
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    db_path = os.path.join(base_dir, 'data', 'gaokao.db')
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    return conn
-
 # API 接口 1: 获取某年的一分一段数据
 @router.get("/{year}", response_model=List[ScoreSegment])
 async def get_score_segments(year: int, min_score: Optional[int] = None, max_score: Optional[int] = None):
@@ -45,7 +37,7 @@ async def get_score_segments(year: int, min_score: Optional[int] = None, max_sco
     - /api/yunnan/segments/2024
     - /api/yunnan/segments/2024?min_score=600&max_score=700
     """
-    conn = get_db_connection()
+    conn = get_connection()
     cursor = conn.cursor()
     
     query = "SELECT * FROM yunnan_physics_score_segments WHERE year = ?"
@@ -83,7 +75,7 @@ async def get_rank_by_score(year: int, score: int):
     - 该分数对应的累计位次
     - 同分人数
     """
-    conn = get_db_connection()
+    conn = get_connection()
     cursor = conn.cursor()
     
     cursor.execute('''
@@ -97,7 +89,7 @@ async def get_rank_by_score(year: int, score: int):
     
     if not row:
         # 如果没有精确匹配，查找最接近的分数
-        conn = get_db_connection()
+        conn = get_connection()
         cursor = conn.cursor()
         cursor.execute('''
             SELECT score, cumulative_count, count 
@@ -139,7 +131,7 @@ async def get_score_by_rank(year: int, rank: int):
     返回:
     - 该位次对应的分数
     """
-    conn = get_db_connection()
+    conn = get_connection()
     cursor = conn.cursor()
     
     cursor.execute('''
@@ -174,7 +166,7 @@ async def get_segment_stats(year: int):
     - 总人数
     - 分数段分布
     """
-    conn = get_db_connection()
+    conn = get_connection()
     cursor = conn.cursor()
     
     # 基本统计
@@ -231,7 +223,7 @@ async def compare_years(year1: int, year2: int, score: int):
     示例:
     - /api/yunnan/segments/compare/2024/2025/650
     """
-    conn = get_db_connection()
+    conn = get_connection()
     cursor = conn.cursor()
     
     result = {}
