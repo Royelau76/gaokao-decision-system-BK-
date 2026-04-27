@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Layout, Card, Row, Col, Button, Typography, Space, message } from 'antd';
-import { SearchOutlined, EditOutlined, ArrowLeftOutlined, ExperimentOutlined, HolderOutlined } from '@ant-design/icons';
+import { SearchOutlined, EditOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import QueryPanel from './components/QueryPanel';
 import DataEntry from './components/DataEntry';
 import StudentForm from './components/StudentForm';
@@ -230,16 +230,16 @@ function App() {
         </div>
         {page !== 'home' && (
           <Space style={{ marginLeft: 32 }}>
-            <Button ghost size="small" onClick={() => setPage('query')}
-              type={page === 'query' ? 'primary' : 'default'} ghost>
+            <Button size="small" ghost onClick={() => setPage('query')}
+              type={page === 'query' ? 'primary' : 'default'}>
               数据查询
             </Button>
-            <Button ghost size="small" onClick={() => setPage('simulator')}
-              type={page === 'simulator' ? 'primary' : 'default'} ghost>
+            <Button size="small" ghost onClick={() => setPage('simulator')}
+              type={page === 'simulator' ? 'primary' : 'default'}>
               志愿填报
             </Button>
-            <Button ghost size="small" onClick={() => setPage('data-entry')}
-              type={page === 'data-entry' ? 'primary' : 'default'} ghost>
+            <Button size="small" ghost onClick={() => setPage('data-entry')}
+              type={page === 'data-entry' ? 'primary' : 'default'}>
               数据录入
             </Button>
           </Space>

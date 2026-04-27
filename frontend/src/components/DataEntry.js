@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Tabs, Table, Tag, Input, Select, Button, Card, Row, Col, message, Modal, Form, Popconfirm, Upload, Space } from 'antd';
+import { Tabs, Table, Tag, Input, Select, Button, Card, Row, Col, message, Modal, Form, Popconfirm, Upload } from 'antd';
 import { PlusOutlined, DeleteOutlined, UploadOutlined, DownloadOutlined } from '@ant-design/icons';
 
 const API = '/api/data-entry';
