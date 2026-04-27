@@ -8,14 +8,8 @@ echo.
 
 REM --- Kill existing processes on ports ---
 echo [INFO] Checking port usage...
-for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":8000.*LISTENING" 2^>nul') do (
-    echo   Stopping process on port 8000: %%a
-    taskkill /F /PID %%a >nul 2>&1
-)
-for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":3000.*LISTENING" 2^>nul') do (
-    echo   Stopping process on port 3000: %%a
-    taskkill /F /PID %%a >nul 2>&1
-)
+powershell -NoProfile -Command "netstat -ano|Select-String ':8000.*LISTENING'|ForEach-Object{stop-process -id ((-split$_)[-1]) -force -erroraction silentlycontinue}" 2>nul
+powershell -NoProfile -Command "netstat -ano|Select-String ':3000.*LISTENING'|ForEach-Object{stop-process -id ((-split$_)[-1]) -force -erroraction silentlycontinue}" 2>nul
 echo [OK] Ports cleared
 echo.
 
