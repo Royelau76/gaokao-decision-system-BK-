@@ -32,13 +32,12 @@ if %ERRORLEVEL% equ 0 (
     pip install -r backend\requirements.txt
     echo [OK] Backend dependencies installed
 )
+echo.
 
 REM --- Start backend ---
-echo [INFO] Starting backend (http://localhost:8000) ...
-start "Backend" cmd /k "cd /d %~dp0backend && python main.py && pause"
-echo [OK] Backend started in new window
-echo       API docs: http://localhost:8000/docs
-echo.
+echo [INFO] Starting backend on http://localhost:8000 ...
+start "Backend" /MIN cmd /c "cd /d %~dp0backend && python main.py"
+echo [OK] Backend starting...
 
 REM --- Check Node.js ---
 where node >nul 2>&1
@@ -58,11 +57,33 @@ if not exist "frontend\node_modules" (
     cd ..
 )
 echo [OK] Frontend dependencies ready
+echo.
 
 REM --- Start frontend ---
-echo [INFO] Starting frontend (http://localhost:3000) ...
-start "Frontend" cmd /k "cd /d %~dp0frontend && npm start && pause"
-echo [OK] Frontend started in new window
+echo [INFO] Starting frontend on http://localhost:3000 ...
+start "Frontend" /MIN cmd /c "cd /d %~dp0frontend && npm start"
+echo [OK] Frontend starting...
+
+REM --- Wait for services to be ready ---
+echo.
+echo [INFO] Waiting for services to start...
+echo        (this may take 30-60 seconds on first run)
+:wait_backend
+timeout /t 3 /nobreak >nul
+powershell -NoProfile -Command "try{$r=Invoke-WebRequest -Uri http://localhost:8000 -TimeoutSec 2 -UseBasicParsing;exit 0}catch{exit 1}" 2>nul
+if %ERRORLEVEL% neq 0 goto wait_backend
+echo [OK] Backend ready
+
+:wait_frontend
+timeout /t 3 /nobreak >nul
+powershell -NoProfile -Command "try{$r=Invoke-WebRequest -Uri http://localhost:3000 -TimeoutSec 2 -UseBasicParsing;exit 0}catch{exit 1}" 2>nul
+if %ERRORLEVEL% neq 0 goto wait_frontend
+echo [OK] Frontend ready
+
+REM --- Open browser ---
+echo.
+echo [INFO] Opening browser...
+start http://localhost:3000
 
 echo.
 echo ========================================
@@ -72,5 +93,6 @@ echo   Backend  : http://localhost:8000
 echo   API Docs : http://localhost:8000/docs
 echo ========================================
 echo.
-echo Close backend/frontend windows to stop.
+echo Backend/Frontend running in minimized windows.
+echo Close them from taskbar to stop the system.
 pause
