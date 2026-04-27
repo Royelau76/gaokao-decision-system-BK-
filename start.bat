@@ -21,11 +21,13 @@ start "Frontend" cmd /c "cd /d %~dp0frontend && set BROWSER=none && npm start"
 REM --- Open browser after delay ---
 echo Waiting 20 seconds for services to start...
 timeout /t 20 /nobreak
-start http://localhost:3000
 
 echo.
-echo Frontend: http://localhost:3000
-echo Backend:  http://localhost:8000
+echo ========================================
+echo   System Ready!
+echo   Open in browser: http://localhost:3000
+echo   Backend API docs: http://localhost:8000/docs
+echo ========================================
 echo.
 echo Close Backend/Frontend windows to stop.
 pause
