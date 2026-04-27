@@ -23,9 +23,15 @@ if %ERRORLEVEL% neq 0 (
 echo [OK] Python found
 
 REM --- Install backend dependencies ---
-echo [INFO] Installing backend dependencies...
-pip install -r backend\requirements.txt -q 2>nul
-echo [OK] Backend dependencies ready
+echo [INFO] Checking backend dependencies...
+python -c "import fastapi, uvicorn, pydantic" 2>nul
+if %ERRORLEVEL% equ 0 (
+    echo [OK] Backend dependencies already installed
+) else (
+    echo [INFO] Installing backend dependencies...
+    pip install -r backend\requirements.txt
+    echo [OK] Backend dependencies installed
+)
 
 REM --- Start backend ---
 echo [INFO] Starting backend (http://localhost:8000) ...
