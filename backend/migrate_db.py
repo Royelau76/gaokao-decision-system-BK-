@@ -58,7 +58,7 @@ def main():
     required_tables = [
         'yunnan_physics_scores',
         'yunnan_physics_score_segments',
-        'yunnan_b_segment_plans',
+        'yunnan_plan_data',
     ]
 
     for table in required_tables:
@@ -79,7 +79,7 @@ def main():
             execute_sql_file('create_yunnan_physics_scores.sql')
         elif table == 'yunnan_physics_score_segments':
             execute_sql_file('create_score_segments_table.sql')
-        elif table == 'yunnan_b_segment_plans':
+        elif table == 'yunnan_plan_data':
             execute_sql_file('create_b_segment_plans.sql')
 
     # Also ensure province_subjects and import_logs exist

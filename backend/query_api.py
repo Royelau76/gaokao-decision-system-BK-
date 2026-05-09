@@ -147,14 +147,15 @@ async def query_by_plan(
     university_name: Optional[str] = Query(None, description="院校名称，支持模糊匹配"),
     university_id: Optional[str] = Query(None, description="院校ID"),
     year: Optional[int] = Query(None, description="招生年份"),
+    batch_type: Optional[str] = Query(None, description="批次类型，如本科批B段"),
     limit: int = Query(100, ge=1, le=500)
 ):
     """
-    按院校和年份查询本科批B段招生计划。
+    按院校和年份查询招生计划。
 
     示例:
     - /api/query/by-plan?university_name=上海交通&year=2025
-    - /api/query/by-plan?university_id=shjd&year=2026
+    - /api/query/by-plan?university_id=shjd&year=2026&batch_type=本科批B段
     """
     conn = get_connection()
     cursor = conn.cursor()
@@ -171,6 +172,9 @@ async def query_by_plan(
     if year:
         conditions.append("year = ?")
         params.append(year)
+    if batch_type:
+        conditions.append("batch_type = ?")
+        params.append(batch_type)
 
     where = " AND ".join(conditions)
 
@@ -178,8 +182,8 @@ async def query_by_plan(
         SELECT id, university_id, university_name, year, major_code,
                major_group_sequence, major_group_name, required_subjects,
                major_category, included_majors, tuition, enrollment_count,
-               campus, notes, data_source
-        FROM yunnan_b_segment_plans
+               campus, notes, data_source, batch_type
+        FROM yunnan_plan_data
         WHERE {where}
         ORDER BY university_name, major_code
         LIMIT ?

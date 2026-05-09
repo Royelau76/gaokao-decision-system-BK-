@@ -247,6 +247,7 @@ class BSegmentPlanInput(BaseModel):
     campus: Optional[str] = ""
     notes: Optional[str] = ""
     data_source: Optional[str] = ""
+    batch_type: Optional[str] = "本科批B段"
 
 
 @router.get("/plans")
@@ -258,7 +259,7 @@ async def list_plans(year: Optional[int] = None, university_id: Optional[str] = 
     params = []
     if year: conds.append("year=?"); params.append(year)
     if university_id: conds.append("university_id=?"); params.append(university_id)
-    c.execute(f"SELECT * FROM yunnan_b_segment_plans WHERE {' AND '.join(conds)} ORDER BY year DESC, university_name, major_code LIMIT ?",
+    c.execute(f"SELECT * FROM yunnan_plan_data WHERE {' AND '.join(conds)} ORDER BY year DESC, university_name, major_code LIMIT ?",
               params + [limit])
     rows = [dict(r) for r in c.fetchall()]
     conn.close()
@@ -271,16 +272,16 @@ async def create_plan(item: BSegmentPlanInput):
     c = conn.cursor()
     try:
         c.execute("""
-            INSERT INTO yunnan_b_segment_plans
+            INSERT INTO yunnan_plan_data
                 (university_id, university_name, year, major_code, major_group_sequence,
                  major_group_name, required_subjects, major_category, included_majors,
-                 tuition, enrollment_count, campus, notes, data_source)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                 tuition, enrollment_count, campus, notes, data_source, batch_type)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (item.university_id, item.university_name, item.year, item.major_code,
               item.major_group_sequence or "", item.major_group_name or "",
               item.required_subjects or "", item.major_category,
               item.included_majors or "", item.tuition, item.enrollment_count,
-              item.campus or "", item.notes or "", item.data_source or ""))
+              item.campus or "", item.notes or "", item.data_source or "", item.batch_type))
         conn.commit()
         return {"status": "ok", "id": c.lastrowid}
     except Exception as e:
@@ -295,17 +296,17 @@ async def update_plan(row_id: int, item: BSegmentPlanInput):
     c = conn.cursor()
     try:
         c.execute("""
-            UPDATE yunnan_b_segment_plans SET
+            UPDATE yunnan_plan_data SET
                 university_id=?, university_name=?, year=?, major_code=?,
                 major_group_sequence=?, major_group_name=?, required_subjects=?,
                 major_category=?, included_majors=?, tuition=?, enrollment_count=?,
-                campus=?, notes=?, data_source=?
+                campus=?, notes=?, data_source=?, batch_type=?
             WHERE id=?
         """, (item.university_id, item.university_name, item.year, item.major_code,
               item.major_group_sequence or "", item.major_group_name or "",
               item.required_subjects or "", item.major_category,
               item.included_majors or "", item.tuition, item.enrollment_count,
-              item.campus or "", item.notes or "", item.data_source or "", row_id))
+              item.campus or "", item.notes or "", item.data_source or "", item.batch_type, row_id))
         conn.commit()
         return {"status": "ok"}
     except Exception as e:
@@ -318,7 +319,7 @@ async def update_plan(row_id: int, item: BSegmentPlanInput):
 async def delete_plan(row_id: int):
     conn = get_connection()
     c = conn.cursor()
-    c.execute("DELETE FROM yunnan_b_segment_plans WHERE id=?", (row_id,))
+    c.execute("DELETE FROM yunnan_plan_data WHERE id=?", (row_id,))
     conn.commit()
     conn.close()
     return {"status": "ok"}
@@ -360,17 +361,18 @@ async def batch_import(req: BatchImportRequest):
                       row.get("notes", "")))
             elif req.table == "plans":
                 c.execute("""
-                    INSERT OR REPLACE INTO yunnan_b_segment_plans
+                    INSERT OR REPLACE INTO yunnan_plan_data
                         (university_id, university_name, year, major_code, major_group_sequence,
                          major_group_name, required_subjects, major_category, included_majors,
-                         tuition, enrollment_count, campus, notes, data_source)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                         tuition, enrollment_count, campus, notes, data_source, batch_type)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """, (row.get("university_id", ""), row.get("university_name", ""), req.year,
                       row.get("major_code", ""), row.get("major_group_sequence", ""),
                       row.get("major_group_name", ""), row.get("required_subjects", ""),
                       row.get("major_category", ""), row.get("included_majors", ""),
                       row.get("tuition"), row.get("enrollment_count"),
-                      row.get("campus", ""), row.get("notes", ""), row.get("data_source", "")))
+                      row.get("campus", ""), row.get("notes", ""), row.get("data_source", ""),
+                      row.get("batch_type", "本科批B段")))
             ok += 1
         except Exception as e:
             fail += 1

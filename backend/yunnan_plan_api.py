@@ -41,8 +41,8 @@ async def get_b_segment_plans(year: int, university_id: str):
     cursor = conn.cursor()
     
     cursor.execute('''
-        SELECT * FROM yunnan_b_segment_plans
-        WHERE year = ? AND university_id = ?
+        SELECT * FROM yunnan_plan_data
+        WHERE batch_type = '本科批B段' AND year = ? AND university_id = ?
         ORDER BY major_code
     ''', (year, university_id))
     
@@ -68,8 +68,8 @@ async def get_plans_by_subject(year: int, subject: str, university_id: Optional[
     cursor = conn.cursor()
     
     query = '''
-        SELECT * FROM yunnan_b_segment_plans 
-        WHERE year = ? AND required_subjects LIKE ?
+        SELECT * FROM yunnan_plan_data
+        WHERE batch_type = '本科批B段' AND year = ? AND required_subjects LIKE ?
     '''
     params = [year, f'%{subject}%']
     
@@ -98,8 +98,8 @@ async def get_plan_by_code(year: int, university_id: str, major_code: str):
     cursor = conn.cursor()
 
     cursor.execute('''
-        SELECT * FROM yunnan_b_segment_plans
-        WHERE year = ? AND university_id = ? AND major_code = ?
+        SELECT * FROM yunnan_plan_data
+        WHERE batch_type = '本科批B段' AND year = ? AND university_id = ? AND major_code = ?
     ''', (year, university_id, major_code))
     
     row = cursor.fetchone()
@@ -125,8 +125,8 @@ async def get_b_segment_universities(year: int):
     cursor.execute('''
         SELECT DISTINCT university_id, university_name,
                SUM(enrollment_count) as total_enrollment
-        FROM yunnan_b_segment_plans 
-        WHERE year = ?
+        FROM yunnan_plan_data
+        WHERE batch_type = '本科批B段' AND year = ?
         GROUP BY university_id, university_name
         ORDER BY total_enrollment DESC
     ''', (year,))
@@ -159,8 +159,8 @@ async def get_b_segment_stats(year: int):
             COUNT(*) as total_majors,
             SUM(enrollment_count) as total_enrollment,
             AVG(tuition) as avg_tuition
-        FROM yunnan_b_segment_plans 
-        WHERE year = ?
+        FROM yunnan_plan_data
+        WHERE batch_type = '本科批B段' AND year = ?
     ''', (year,))
     
     stats = cursor.fetchone()
@@ -168,8 +168,8 @@ async def get_b_segment_stats(year: int):
     # 按选考科目统计
     cursor.execute('''
         SELECT required_subjects, COUNT(*) as count, SUM(enrollment_count) as enrollment
-        FROM yunnan_b_segment_plans 
-        WHERE year = ?
+        FROM yunnan_plan_data
+        WHERE batch_type = '本科批B段' AND year = ?
         GROUP BY required_subjects
     ''', (year,))
     
@@ -178,8 +178,8 @@ async def get_b_segment_stats(year: int):
     # 按校区统计
     cursor.execute('''
         SELECT campus, COUNT(*) as count, SUM(enrollment_count) as enrollment
-        FROM yunnan_b_segment_plans 
-        WHERE year = ?
+        FROM yunnan_plan_data
+        WHERE batch_type = '本科批B段' AND year = ?
         GROUP BY campus
     ''', (year,))
     

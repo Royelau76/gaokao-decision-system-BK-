@@ -16,7 +16,7 @@ from db import get_db_path, get_connection
 # 导入云南物理类招生数据 API
 from yunnan_physics_api import router as yunnan_physics_router
 from yunnan_score_segments_api import router as yunnan_segments_router
-from yunnan_b_segment_api import router as yunnan_b_segment_router
+from yunnan_plan_api import router as yunnan_b_segment_router
 from query_api import router as query_router
 from data_entry_api import router as data_entry_router
 
@@ -182,14 +182,15 @@ def init_database():
     )
     ''')
 
-    # 本科批B段招生计划表
+    # 招生计划表（统一本科批各段）
     cursor.execute('''
-    CREATE TABLE IF NOT EXISTS yunnan_b_segment_plans (
+    CREATE TABLE IF NOT EXISTS yunnan_plan_data (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         year INTEGER NOT NULL,
         university_id TEXT NOT NULL,
         university_name TEXT NOT NULL,
-        major_group_code TEXT NOT NULL,
+        major_group_sequence TEXT,
+        major_code TEXT NOT NULL,
         major_group_name TEXT,
         required_subjects TEXT,
         major_category TEXT NOT NULL,
@@ -198,12 +199,29 @@ def init_database():
         enrollment_count INTEGER,
         campus TEXT,
         notes TEXT,
+        batch_type TEXT NOT NULL DEFAULT '本科批B段',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         data_source TEXT,
-        UNIQUE(year, university_id, major_group_code, major_category)
+        UNIQUE(year, university_id, major_code, major_category, batch_type)
     )
     ''')
+
+    # 迁移：旧表 → 新表
+    try:
+        old_exists = cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='yunnan_b_segment_plans'").fetchone()
+        if old_exists:
+            new_exists = cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='yunnan_plan_data'").fetchone()
+            if not new_exists:
+                cursor.execute("ALTER TABLE yunnan_b_segment_plans RENAME TO yunnan_plan_data")
+                cursor.execute("ALTER TABLE yunnan_plan_data ADD COLUMN batch_type TEXT NOT NULL DEFAULT '本科批B段'")
+            else:
+                # 新表已存在，确保旧数据已迁入后删除旧表
+                cursor.execute("INSERT OR IGNORE INTO yunnan_plan_data (id, year, university_id, university_name, major_group_sequence, major_code, major_group_name, required_subjects, major_category, included_majors, tuition, enrollment_count, campus, notes, batch_type, created_at, updated_at, data_source) SELECT id, year, university_id, university_name, major_group_sequence, major_code, major_group_name, required_subjects, major_category, included_majors, tuition, enrollment_count, campus, notes, '本科批B段', created_at, updated_at, data_source FROM yunnan_b_segment_plans")
+                cursor.execute("DROP TABLE yunnan_b_segment_plans")
+            conn.commit()
+    except Exception:
+        pass
 
     # 招生分数线主表
     cursor.execute('''
