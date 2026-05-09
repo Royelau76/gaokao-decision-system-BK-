@@ -39,7 +39,8 @@ const StudentForm = ({ onSubmit }) => {
         layout="vertical"
         initialValues={{
           subjects: ['物理', '化学', '生物'],
-          risk_tolerance: '稳健'
+          risk_tolerance: '稳健',
+          year: 2025
         }}
       >
         <Row gutter={24}>
@@ -67,6 +68,30 @@ const StudentForm = ({ onSubmit }) => {
                 disabled
                 placeholder="输入分数后自动计算"
               />
+            </Form.Item>
+          </Col>
+        </Row>
+
+        <Row gutter={24}>
+          <Col span={12}>
+            <Form.Item name="year" label="参考年份" rules={[{ required: true }]}>
+              <Select>
+                <Option value={2024}>2024年</Option>
+                <Option value={2025}>2025年</Option>
+              </Select>
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item
+              name="risk_tolerance"
+              label="风险偏好"
+              rules={[{ required: true }]}
+            >
+              <Select>
+                <Option value="激进">激进 - 冲名校，接受调剂</Option>
+                <Option value="稳健">稳健 - 平衡理想与稳妥</Option>
+                <Option value="保守">保守 - 确保录取，不滑档</Option>
+              </Select>
             </Form.Item>
           </Col>
         </Row>
@@ -118,18 +143,6 @@ const StudentForm = ({ onSubmit }) => {
             <Option value="自动化">自动化</Option>
             <Option value="数学">数学与应用数学</Option>
             <Option value="物理">物理学</Option>
-          </Select>
-        </Form.Item>
-
-        <Form.Item
-          name="risk_tolerance"
-          label="风险偏好"
-          rules={[{ required: true }]}
-        >
-          <Select>
-            <Option value="激进">激进 - 冲名校，接受调剂</Option>
-            <Option value="稳健">稳健 - 平衡理想与稳妥</Option>
-            <Option value="保守">保守 - 确保录取，不滑档</Option>
           </Select>
         </Form.Item>
 

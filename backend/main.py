@@ -60,6 +60,7 @@ class StudentInfo(BaseModel):
     preference_region: List[str]  # 偏好地区
     preference_major: List[str]   # 偏好专业
     risk_tolerance: str           # 风险偏好：激进/稳健/保守
+    year: Optional[int] = None    # 参考年份，默认取最新
 
 class University(BaseModel):
     """院校信息"""
@@ -367,11 +368,21 @@ def convert_score_to_rank(score: int, year: Optional[int] = None) -> tuple:
     return 5000, year
 
 def calculate_recommendations(student: StudentInfo) -> List[RecommendationResult]:
-    
+
     score = student.score
     rank = student.rank
     risk = student.risk_tolerance
-    
+
+    # 确定查询年份
+    year = student.year
+    if year is None:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT MAX(year) FROM yunnan_physics_scores")
+        row = cursor.fetchone()
+        year = row[0] if row else 2024
+        conn.close()
+
     # 根据风险偏好调整分数范围
     if risk == "激进":
         chong_score_min = score + 3      # 冲：高3-10分
@@ -401,35 +412,35 @@ def calculate_recommendations(student: StudentInfo) -> List[RecommendationResult
     
     # 冲：分数略高于考生（按专业粒度）
     cursor.execute('''
-    SELECT s.*, u.level, u.province 
+    SELECT s.*, u.level, u.province
     FROM yunnan_physics_scores s
     JOIN universities u ON s.university_id = u.id
-    WHERE s.year = 2024 AND s.min_score >= ? AND s.min_score <= ?
+    WHERE s.year = ? AND s.min_score >= ? AND s.min_score <= ?
     ORDER BY s.min_score ASC, s.enrollment_count DESC
     LIMIT 20
-    ''', (chong_score_min, chong_score_max))
+    ''', (year, chong_score_min, chong_score_max))
     chong_majors = cursor.fetchall()
-    
+
     # 稳：分数匹配考生
     cursor.execute('''
-    SELECT s.*, u.level, u.province 
+    SELECT s.*, u.level, u.province
     FROM yunnan_physics_scores s
     JOIN universities u ON s.university_id = u.id
-    WHERE s.year = 2024 AND s.min_score >= ? AND s.min_score <= ?
+    WHERE s.year = ? AND s.min_score >= ? AND s.min_score <= ?
     ORDER BY ABS(s.min_score - ?) ASC, s.enrollment_count DESC
     LIMIT 30
-    ''', (wen_score_min, wen_score_max, score))
+    ''', (year, wen_score_min, wen_score_max, score))
     wen_majors = cursor.fetchall()
-    
+
     # 保：分数低于考生
     cursor.execute('''
-    SELECT s.*, u.level, u.province 
+    SELECT s.*, u.level, u.province
     FROM yunnan_physics_scores s
     JOIN universities u ON s.university_id = u.id
-    WHERE s.year = 2024 AND s.min_score >= ? AND s.min_score < ?
+    WHERE s.year = ? AND s.min_score >= ? AND s.min_score < ?
     ORDER BY s.min_score DESC, s.enrollment_count DESC
     LIMIT 20
-    ''', (bao_score_min, bao_score_max))
+    ''', (year, bao_score_min, bao_score_max))
     bao_majors = cursor.fetchall()
     
     conn.close()
