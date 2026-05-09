@@ -27,6 +27,11 @@ const RecommendationList = ({ recommendations, onGenerateVolunteerTable }) => {
       key: 'major'
     },
     {
+      title: '最低位次',
+      dataIndex: 'min_rank',
+      key: 'min_rank'
+    },
+    {
       title: '录取概率',
       dataIndex: 'admission_probability',
       key: 'probability',

@@ -81,6 +81,7 @@ class RecommendationResult(BaseModel):
     major: str                    # 专业
     major_code: str = ""          # 专业代码
     min_score: float = 0          # 最低分
+    min_rank: Optional[int] = None  # 最低位次
     max_score: Optional[float] = None
     avg_score: Optional[float] = None
     enrollment_count: Optional[int] = None
@@ -368,10 +369,12 @@ def convert_score_to_rank(score: int, year: Optional[int] = None) -> tuple:
     return 5000, year
 
 def calculate_recommendations(student: StudentInfo) -> List[RecommendationResult]:
-
     score = student.score
     rank = student.rank
     risk = student.risk_tolerance
+
+    if not rank:
+        rank, _ = convert_score_to_rank(score)
 
     # 确定查询年份
     year = student.year
@@ -383,75 +386,67 @@ def calculate_recommendations(student: StudentInfo) -> List[RecommendationResult
         year = row[0] if row else 2024
         conn.close()
 
-    # 根据风险偏好调整分数范围
-    if risk == "激进":
-        chong_score_min = score + 3      # 冲：高3-10分
-        chong_score_max = score + 10
-        wen_score_min = score - 2        # 稳：±2分
-        wen_score_max = score + 2
-        bao_score_max = score - 3        # 保：低3-15分
-        bao_score_min = score - 15
-    elif risk == "保守":
-        chong_score_min = score + 1      # 冲：高1-5分
-        chong_score_max = score + 5
-        wen_score_min = score - 5        # 稳：±5分
-        wen_score_max = score + 5
-        bao_score_max = score - 5        # 保：低5-20分
-        bao_score_min = score - 20
-    else:  # 稳健
-        chong_score_min = score + 2      # 冲：高2-8分
-        chong_score_max = score + 8
-        wen_score_min = score - 3        # 稳：±3分
-        wen_score_max = score + 3
-        bao_score_max = score - 3        # 保：低3-15分
-        bao_score_min = score - 15
-    
+    # 位次容差范围（位次越小=排名越高）
+    # 冲：院校位次高于考生（位次数字更小），稳：院校位次接近考生，保：院校位次低于考生
+    RANK_TOLERANCE = {
+        "激进": {"冲": (rank - 500, rank), "稳": (rank - 500, rank + 500), "保": (rank + 500, rank + 1500)},
+        "稳健": {"冲": (rank - 300, rank), "稳": (rank - 300, rank + 300), "保": (rank + 300, rank + 1000)},
+        "保守": {"冲": (rank - 200, rank), "稳": (rank - 200, rank + 200), "保": (rank + 200, rank + 800)},
+    }
+
+    tiers = RANK_TOLERANCE.get(risk, RANK_TOLERANCE["稳健"])
+    chong_rank_min, chong_rank_max = tiers["冲"]
+    wen_rank_min, wen_rank_max = tiers["稳"]
+    bao_rank_min, bao_rank_max = tiers["保"]
+
     # 查询数据库
     conn = get_connection()
     cursor = conn.cursor()
-    
-    # 冲：分数略高于考生（按专业粒度）
+
+    # 冲：院校位次高于考生（min_rank更小）
     cursor.execute('''
     SELECT s.*, u.level, u.province
     FROM yunnan_physics_scores s
     JOIN universities u ON s.university_id = u.id
-    WHERE s.year = ? AND s.min_score >= ? AND s.min_score <= ?
-    ORDER BY s.min_score ASC, s.enrollment_count DESC
+    WHERE s.year = ? AND s.min_rank >= ? AND s.min_rank <= ?
+    ORDER BY s.min_rank ASC, s.enrollment_count DESC
     LIMIT 20
-    ''', (year, chong_score_min, chong_score_max))
+    ''', (year, chong_rank_min, chong_rank_max))
     chong_majors = cursor.fetchall()
 
-    # 稳：分数匹配考生
+    # 稳：院校位次接近考生
     cursor.execute('''
     SELECT s.*, u.level, u.province
     FROM yunnan_physics_scores s
     JOIN universities u ON s.university_id = u.id
-    WHERE s.year = ? AND s.min_score >= ? AND s.min_score <= ?
-    ORDER BY ABS(s.min_score - ?) ASC, s.enrollment_count DESC
+    WHERE s.year = ? AND s.min_rank >= ? AND s.min_rank <= ?
+    ORDER BY ABS(s.min_rank - ?) ASC, s.enrollment_count DESC
     LIMIT 30
-    ''', (year, wen_score_min, wen_score_max, score))
+    ''', (year, wen_rank_min, wen_rank_max, rank))
     wen_majors = cursor.fetchall()
 
-    # 保：分数低于考生
+    # 保：院校位次低于考生（min_rank更大）
     cursor.execute('''
     SELECT s.*, u.level, u.province
     FROM yunnan_physics_scores s
     JOIN universities u ON s.university_id = u.id
-    WHERE s.year = ? AND s.min_score >= ? AND s.min_score < ?
-    ORDER BY s.min_score DESC, s.enrollment_count DESC
+    WHERE s.year = ? AND s.min_rank >= ? AND s.min_rank <= ?
+    ORDER BY s.min_rank DESC, s.enrollment_count DESC
     LIMIT 20
-    ''', (year, bao_score_min, bao_score_max))
+    ''', (year, bao_rank_min, bao_rank_max))
     bao_majors = cursor.fetchall()
-    
+
     conn.close()
-    
+
     # 生成推荐结果
+    recommendations = []
     order = 1
-    
+
     # 冲刺层（4个）
     for row in chong_majors[:4]:
         major = dict(row)
-        prob = max(15, 45 - (major['min_score'] - score) * 5)
+        rank_diff = rank - major['min_rank']  # 正值=考生位次更高(数字更小)
+        prob = max(15, min(45, 45 - abs(rank_diff) / 10))
         recommendations.append({
             "level": "冲",
             "university_name": major['university_name'],
@@ -459,6 +454,7 @@ def calculate_recommendations(student: StudentInfo) -> List[RecommendationResult
             "major": major['major_category'],
             "major_code": major.get('major_code', ''),
             "min_score": major['min_score'],
+            "min_rank": major.get('min_rank'),
             "max_score": major.get('max_score'),
             "avg_score": major.get('avg_score'),
             "enrollment_count": major.get('enrollment_count'),
@@ -471,8 +467,8 @@ def calculate_recommendations(student: StudentInfo) -> List[RecommendationResult
     # 稳妥层（10个）
     for row in wen_majors[:10]:
         major = dict(row)
-        score_diff = abs(major['min_score'] - score)
-        prob = max(50, 85 - score_diff * 8)
+        rank_diff = abs(rank - major['min_rank'])
+        prob = max(50, min(85, 85 - rank_diff / 10))
         recommendations.append({
             "level": "稳",
             "university_name": major['university_name'],
@@ -480,6 +476,7 @@ def calculate_recommendations(student: StudentInfo) -> List[RecommendationResult
             "major": major['major_category'],
             "major_code": major.get('major_code', ''),
             "min_score": major['min_score'],
+            "min_rank": major.get('min_rank'),
             "max_score": major.get('max_score'),
             "avg_score": major.get('avg_score'),
             "enrollment_count": major.get('enrollment_count'),
@@ -492,7 +489,8 @@ def calculate_recommendations(student: StudentInfo) -> List[RecommendationResult
     # 保底层（6个）
     for row in bao_majors[:6]:
         major = dict(row)
-        prob = min(95, 90 + (score - major['min_score']) * 2)
+        rank_diff = major['min_rank'] - rank  # 正值=院校位次更低(数字更大)
+        prob = max(90, min(98, 90 + rank_diff / 20))
         recommendations.append({
             "level": "保",
             "university_name": major['university_name'],
@@ -500,6 +498,7 @@ def calculate_recommendations(student: StudentInfo) -> List[RecommendationResult
             "major": major['major_category'],
             "major_code": major.get('major_code', ''),
             "min_score": major['min_score'],
+            "min_rank": major.get('min_rank'),
             "max_score": major.get('max_score'),
             "avg_score": major.get('avg_score'),
             "enrollment_count": major.get('enrollment_count'),
@@ -508,7 +507,7 @@ def calculate_recommendations(student: StudentInfo) -> List[RecommendationResult
             "school_level": major.get('level', '')
         })
         order += 1
-    
+
     return recommendations
 
 def select_best_major(university: dict, student: StudentInfo) -> str:
