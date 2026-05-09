@@ -82,7 +82,7 @@ function SchoolQuery({ universities }) {
   return (
     <div>
       <Row gutter={12} style={{ marginBottom: 16 }}>
-        <Col span={6}>
+        <Col xs={24} sm={12} md={6}>
           <Select
             showSearch
             allowClear
@@ -101,7 +101,7 @@ function SchoolQuery({ universities }) {
             ))}
           </Select>
         </Col>
-        <Col span={5}>
+        <Col xs={24} sm={12} md={5}>
           <Input
             placeholder="专业（如：计算机）"
             value={major}
@@ -109,13 +109,13 @@ function SchoolQuery({ universities }) {
             allowClear
           />
         </Col>
-        <Col span={4}>
+        <Col xs={24} sm={12} md={4}>
           <Select value={year} onChange={setYear} style={{ width: '100%' }}>
             <Select.Option value={2024}>2024年</Select.Option>
             <Select.Option value={2025}>2025年</Select.Option>
           </Select>
         </Col>
-        <Col span={3}>
+        <Col xs={24} sm={12} md={3}>
           <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch} loading={loading}>
             查询
           </Button>
@@ -185,7 +185,7 @@ function RankQuery() {
   return (
     <div>
       <Row gutter={12} style={{ marginBottom: 16 }}>
-        <Col span={5}>
+        <Col xs={24} sm={12} md={5}>
           <Input
             placeholder="输入位次（如：3000）"
             value={rank}
@@ -193,13 +193,13 @@ function RankQuery() {
             type="number"
           />
         </Col>
-        <Col span={4}>
+        <Col xs={24} sm={12} md={4}>
           <Select value={year} onChange={setYear} style={{ width: '100%' }}>
             <Select.Option value={2024}>2024年</Select.Option>
             <Select.Option value={2025}>2025年</Select.Option>
           </Select>
         </Col>
-        <Col span={6}>
+        <Col xs={24} sm={12} md={6}>
           <Select value={tolerance} onChange={setTolerance} style={{ width: '100%' }}>
             <Select.Option value={200}>范围: +/- 200 名</Select.Option>
             <Select.Option value={500}>范围: +/- 500 名</Select.Option>
@@ -207,7 +207,7 @@ function RankQuery() {
             <Select.Option value={2000}>范围: +/- 2000 名</Select.Option>
           </Select>
         </Col>
-        <Col span={3}>
+        <Col xs={24} sm={12} md={3}>
           <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch} loading={loading}>
             查询
           </Button>
@@ -217,7 +217,7 @@ function RankQuery() {
       {results && (
         <div>
           <Row gutter={16} style={{ marginBottom: 16 }}>
-            <Col span={8}>
+            <Col xs={24} sm={8}>
               <Card size="small" style={{ background: '#fff2f0' }}>
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: 28, color: '#ff4d4f', fontWeight: 'bold' }}>{results.summary['冲']}</div>
@@ -225,7 +225,7 @@ function RankQuery() {
                 </div>
               </Card>
             </Col>
-            <Col span={8}>
+            <Col xs={24} sm={8}>
               <Card size="small" style={{ background: '#e6f7ff' }}>
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: 28, color: '#1890ff', fontWeight: 'bold' }}>{results.summary['稳']}</div>
@@ -233,7 +233,7 @@ function RankQuery() {
                 </div>
               </Card>
             </Col>
-            <Col span={8}>
+            <Col xs={24} sm={8}>
               <Card size="small" style={{ background: '#f6ffed' }}>
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: 28, color: '#52c41a', fontWeight: 'bold' }}>{results.summary['保']}</div>
@@ -313,7 +313,7 @@ function PlanQuery({ universities }) {
   return (
     <div>
       <Row gutter={12} style={{ marginBottom: 16 }}>
-        <Col span={8}>
+        <Col xs={24} sm={8}>
           <Select
             showSearch
             allowClear
@@ -332,14 +332,14 @@ function PlanQuery({ universities }) {
             ))}
           </Select>
         </Col>
-        <Col span={4}>
+        <Col xs={24} sm={12} md={4}>
           <Select value={year} onChange={setYear} style={{ width: '100%' }}>
             <Select.Option value={2024}>2024年</Select.Option>
             <Select.Option value={2025}>2025年</Select.Option>
             <Select.Option value={2026}>2026年</Select.Option>
           </Select>
         </Col>
-        <Col span={3}>
+        <Col xs={24} sm={12} md={3}>
           <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch} loading={loading}>
             查询
           </Button>

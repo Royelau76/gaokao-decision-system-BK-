@@ -24,16 +24,32 @@
   margin-bottom: 16px;
 }
 
-/* 响应式调整 */
+/* Desktop nav always visible, mobile nav hidden */
+.desktop-nav {
+  display: flex;
+}
+
+.mobile-nav-btn {
+  display: none;
+}
+
 @media (max-width: 768px) {
+  .desktop-nav {
+    display: none !important;
+  }
+
+  .mobile-nav-btn {
+    display: inline-flex !important;
+  }
+
   .ant-layout-header {
-    padding: 0 20px !important;
+    padding: 0 16px !important;
   }
-  
+
   .ant-layout-content {
-    padding: 20px !important;
+    padding: 16px !important;
   }
-  
+
   .ant-steps {
     font-size: 12px;
   }

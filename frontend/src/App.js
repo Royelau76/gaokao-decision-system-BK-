@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Routes, Route, Link, useNavigate } from 'react-router-dom';
-import { Layout, Card, Row, Col, Button, Typography, Space, message } from 'antd';
-import { SearchOutlined, EditOutlined } from '@ant-design/icons';
+import { Layout, Card, Row, Col, Button, Typography, Space, Drawer, message } from 'antd';
+import { SearchOutlined, EditOutlined, MenuOutlined } from '@ant-design/icons';
 import QueryPanel from './components/QueryPanel';
 import DataEntry from './components/DataEntry';
 import StudentForm from './components/StudentForm';
@@ -51,7 +51,7 @@ function HomePage() {
 
       <Row gutter={24}>
         {features.map(f => (
-          <Col span={12} key={f.key}>
+          <Col xs={24} sm={12} key={f.key}>
             <Card
               hoverable
               style={{ textAlign: 'center', height: '100%', borderRadius: 8 }}
@@ -190,24 +190,36 @@ function ExportPlan({ studentInfo, recommendations }) {
 
 // ====== App 根组件 ======
 function App() {
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const navLinks = [
+    { to: '/query', label: '数据查询' },
+    { to: '/simulator', label: '志愿填报' },
+    { to: '/data-entry', label: '数据录入' },
+  ];
+
   return (
     <Layout className="layout">
-      <Header style={{ background: '#1890ff', padding: '0 50px', display: 'flex', alignItems: 'center' }}>
+      <Header style={{ background: '#1890ff', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Link to="/" style={{ color: 'white', fontSize: 20, fontWeight: 'bold', textDecoration: 'none' }}>
           云志选
         </Link>
-        <Space style={{ marginLeft: 32 }}>
-          <Link to="/query">
-            <Button size="small" ghost>数据查询</Button>
-          </Link>
-          <Link to="/simulator">
-            <Button size="small" ghost>志愿填报</Button>
-          </Link>
-          <Link to="/data-entry">
-            <Button size="small" ghost>数据录入</Button>
-          </Link>
+        <Space className="desktop-nav">
+          {navLinks.map(n => (
+            <Link key={n.to} to={n.to}>
+              <Button size="small" ghost>{n.label}</Button>
+            </Link>
+          ))}
         </Space>
+        <Button className="mobile-nav-btn" type="text" icon={<MenuOutlined />} style={{ color: 'white', fontSize: 18 }} onClick={() => setDrawerOpen(true)} />
       </Header>
+
+      <Drawer title="导航" placement="right" onClose={() => setDrawerOpen(false)} open={drawerOpen} width={200}>
+        {navLinks.map(n => (
+          <p key={n.to} style={{ margin: '12px 0' }}>
+            <Link to={n.to} onClick={() => setDrawerOpen(false)}>{n.label}</Link>
+          </p>
+        ))}
+      </Drawer>
 
       <Content style={{ padding: '40px 50px', minHeight: 'calc(100vh - 134px)' }}>
         <Routes>

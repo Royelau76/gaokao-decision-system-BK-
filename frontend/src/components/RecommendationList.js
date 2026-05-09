@@ -57,7 +57,7 @@ const RecommendationList = ({ recommendations, onGenerateVolunteerTable }) => {
   return (
     <div>
       <Row gutter={16} style={{ marginBottom: 24 }}>
-        <Col span={8}>
+        <Col xs={24} sm={8}>
           <Card>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 32, color: '#ff4d4f', fontWeight: 'bold' }}>{冲数量}</div>
@@ -65,7 +65,7 @@ const RecommendationList = ({ recommendations, onGenerateVolunteerTable }) => {
             </div>
           </Card>
         </Col>
-        <Col span={8}>
+        <Col xs={24} sm={8}>
           <Card>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 32, color: '#1890ff', fontWeight: 'bold' }}>{稳数量}</div>
@@ -73,7 +73,7 @@ const RecommendationList = ({ recommendations, onGenerateVolunteerTable }) => {
             </div>
           </Card>
         </Col>
-        <Col span={8}>
+        <Col xs={24} sm={8}>
           <Card>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 32, color: '#52c41a', fontWeight: 'bold' }}>{保数量}</div>

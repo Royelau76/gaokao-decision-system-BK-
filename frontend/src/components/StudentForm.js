@@ -44,7 +44,7 @@ const StudentForm = ({ onSubmit }) => {
         }}
       >
         <Row gutter={24}>
-          <Col span={12}>
+          <Col xs={24} sm={12}>
             <Form.Item
               name="score"
               label="高考总分"
@@ -73,7 +73,7 @@ const StudentForm = ({ onSubmit }) => {
         </Row>
 
         <Row gutter={24}>
-          <Col span={12}>
+          <Col xs={24} sm={12}>
             <Form.Item name="year" label="参考年份" rules={[{ required: true }]}>
               <Select>
                 <Option value={2024}>2024年</Option>
@@ -103,12 +103,12 @@ const StudentForm = ({ onSubmit }) => {
         >
           <Checkbox.Group>
             <Row>
-              <Col span={8}><Checkbox value="物理">物理</Checkbox></Col>
-              <Col span={8}><Checkbox value="化学">化学</Checkbox></Col>
-              <Col span={8}><Checkbox value="生物">生物</Checkbox></Col>
-              <Col span={8}><Checkbox value="历史">历史</Checkbox></Col>
-              <Col span={8}><Checkbox value="地理">地理</Checkbox></Col>
-              <Col span={8}><Checkbox value="政治">政治</Checkbox></Col>
+              <Col xs={8} sm={4}><Checkbox value="物理">物理</Checkbox></Col>
+              <Col xs={8} sm={4}><Checkbox value="化学">化学</Checkbox></Col>
+              <Col xs={8} sm={4}><Checkbox value="生物">生物</Checkbox></Col>
+              <Col xs={8} sm={4}><Checkbox value="历史">历史</Checkbox></Col>
+              <Col xs={8} sm={4}><Checkbox value="地理">地理</Checkbox></Col>
+              <Col xs={8} sm={4}><Checkbox value="政治">政治</Checkbox></Col>
             </Row>
           </Checkbox.Group>
         </Form.Item>
