@@ -9,7 +9,7 @@ for /f "tokens=5" %%a in ('netstat -ano ^| find ":8000" ^| find "LISTENING" 2^>n
 for /f "tokens=5" %%a in ('netstat -ano ^| find ":3000" ^| find "LISTENING" 2^>nul') do taskkill /f /pid %%a >nul 2>&1
 
 REM --- Check deps ---
-python -c "import fastapi" 2>nul || pip install -r backend\requirements.txt
+python -c "import fastapi,dotenv" 2>nul || pip install -r backend\requirements.txt
 if not exist "frontend\node_modules" (cd frontend && call npm install --legacy-peer-deps && cd ..)
 
 REM --- Start backend ---

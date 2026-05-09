@@ -7,6 +7,9 @@ import sqlite3
 import json
 import os
 from datetime import datetime
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from db import get_db_path, get_connection
 
@@ -32,9 +35,10 @@ app = FastAPI(
 )
 
 # 配置CORS
+cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
