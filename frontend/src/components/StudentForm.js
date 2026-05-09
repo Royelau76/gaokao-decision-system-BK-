@@ -1,23 +1,37 @@
-import React from 'react';
-import { Form, InputNumber, Select, Checkbox, Button, Row, Col, Card } from 'antd';
+import React, { useState } from 'react';
+import { Form, InputNumber, Select, Checkbox, Button, Row, Col, Card, message } from 'antd';
 
 const { Option } = Select;
 
 const StudentForm = ({ onSubmit }) => {
   const [form] = Form.useForm();
+  const [computedRank, setComputedRank] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const onScoreChange = async (score) => {
+    if (!score || score < 400) {
+      setComputedRank(null);
+      return;
+    }
+    try {
+      const resp = await fetch(`/api/score-conversion?score=${score}`);
+      const data = await resp.json();
+      setComputedRank(data.estimated_rank);
+    } catch {
+      setComputedRank(null);
+    }
+  };
 
   const onFinish = (values) => {
-    // 将分数转换为位次
-    const rank = convertScoreToRank(values.score);
     const formData = {
       ...values,
-      rank,
+      rank: computedRank || 5000,
     };
     onSubmit(formData);
   };
 
   return (
-    <Card title="📝 考生信息录入" bordered={false}>
+    <Card title="考生信息录入" bordered={false}>
       <Form
         form={form}
         name="studentForm"
@@ -35,24 +49,23 @@ const StudentForm = ({ onSubmit }) => {
               label="高考总分"
               rules={[{ required: true, message: '请输入高考总分' }]}
             >
-              <InputNumber 
-                min={400} 
-                max={750} 
-                style={{ width: '100%' }} 
+              <InputNumber
+                min={400}
+                max={750}
+                style={{ width: '100%' }}
                 placeholder="请输入分数"
+                onChange={onScoreChange}
               />
             </Form.Item>
           </Col>
-          
+
           <Col span={12}>
-            <Form.Item
-              name="rank"
-              label="全省位次（自动计算）"
-            >
-              <InputNumber 
-                style={{ width: '100%' }} 
-                disabled 
-                placeholder="将根据分数自动计算"
+            <Form.Item label="全省位次（自动计算）">
+              <InputNumber
+                style={{ width: '100%' }}
+                value={computedRank}
+                disabled
+                placeholder="输入分数后自动计算"
               />
             </Form.Item>
           </Col>
@@ -121,50 +134,13 @@ const StudentForm = ({ onSubmit }) => {
         </Form.Item>
 
         <Form.Item>
-          <Button type="primary" htmlType="submit" size="large" block>
-            🚀 开始智能推荐
+          <Button type="primary" htmlType="submit" size="large" block loading={loading}>
+            开始智能推荐
           </Button>
         </Form.Item>
       </Form>
     </Card>
   );
 };
-
-// 分数转位次函数（前端估算）
-function convertScoreToRank(score) {
-  const scoreRankMap = {
-    683: 52,
-    675: 95,
-    670: 169,
-    665: 268,
-    660: 415,
-    655: 619,
-    650: 876,
-    645: 1261,
-    640: 1698,
-    635: 2260,
-    630: 2974,
-    625: 3813,
-    620: 4699,
-    615: 4901,
-  };
-  
-  const scores = Object.keys(scoreRankMap).map(Number).sort((a, b) => a - b);
-  
-  if (score >= Math.max(...scores)) return scoreRankMap[Math.max(...scores)];
-  if (score <= Math.min(...scores)) return scoreRankMap[Math.min(...scores)];
-  
-  for (let i = 0; i < scores.length - 1; i++) {
-    if (scores[i] <= score && score <= scores[i + 1]) {
-      const x1 = scores[i];
-      const y1 = scoreRankMap[x1];
-      const x2 = scores[i + 1];
-      const y2 = scoreRankMap[x2];
-      return Math.round(y1 + (y2 - y1) * (score - x1) / (x2 - x1));
-    }
-  }
-  
-  return 5000;
-}
 
 export default StudentForm;

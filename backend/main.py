@@ -314,17 +314,59 @@ async def create_volunteer_plan(plan: VolunteerPlan):
     return {"status": "success", "message": "志愿方案已保存"}
 
 @app.get("/api/score-conversion")
-async def score_to_rank(score: int):
-    """分数转位次（基于2025年一分一段表）"""
-    rank = convert_score_to_rank(score)
-    return {"score": score, "estimated_rank": rank}
+async def score_to_rank(score: int, year: Optional[int] = None):
+    """分数转位次（基于数据库一分一段表，默认取最新年份）"""
+    rank, year_used = convert_score_to_rank(score, year)
+    return {"score": score, "estimated_rank": rank, "year_used": year_used}
+
+def convert_score_to_rank(score: int, year: Optional[int] = None) -> tuple:
+    """
+    分数转位次（基于数据库一分一段表）
+    使用线性插值估算，返回 (rank, year_used)
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    if year is None:
+        cursor.execute("SELECT MAX(year) FROM yunnan_physics_score_segments")
+        row = cursor.fetchone()
+        year = row[0] if row else 2025
+
+    # 精确匹配
+    cursor.execute(
+        "SELECT cumulative_count FROM yunnan_physics_score_segments WHERE year=? AND score=?",
+        (year, score))
+    row = cursor.fetchone()
+    if row:
+        conn.close()
+        return row['cumulative_count'], year
+
+    # 插值：找 score 两侧最近的两条记录
+    cursor.execute(
+        "SELECT score, cumulative_count FROM yunnan_physics_score_segments WHERE year=? AND score < ? ORDER BY score DESC LIMIT 1",
+        (year, score))
+    lower = cursor.fetchone()
+
+    cursor.execute(
+        "SELECT score, cumulative_count FROM yunnan_physics_score_segments WHERE year=? AND score > ? ORDER BY score ASC LIMIT 1",
+        (year, score))
+    higher = cursor.fetchone()
+
+    conn.close()
+
+    if lower and higher:
+        x1, y1 = lower['score'], lower['cumulative_count']
+        x2, y2 = higher['score'], higher['cumulative_count']
+        rank = int(y1 + (y2 - y1) * (score - x1) / (x2 - x1))
+        return rank, year
+
+    if lower:
+        return lower['cumulative_count'], year
+    if higher:
+        return higher['cumulative_count'], year
+    return 5000, year
 
 def calculate_recommendations(student: StudentInfo) -> List[RecommendationResult]:
-    """
-    核心推荐算法
-    基于2024年实际录取数据，推荐冲稳保三个梯度的院校专业
-    """
-    recommendations = []
     
     score = student.score
     rank = student.rank
@@ -477,47 +519,6 @@ def select_best_major(university: dict, student: StudentInfo) -> str:
 
     # 默认返回第一个专业
     return majors[0].get('name', '专业待定')
-
-def convert_score_to_rank(score: int) -> int:
-    """
-    分数转位次（基于2025年云南一分一段表）
-    使用线性插值估算
-    """
-    # 2025年云南物理类一分一段表关键点
-    score_rank_map = {
-        683: 52,
-        675: 95,
-        670: 169,
-        665: 268,
-        660: 415,
-        655: 619,
-        650: 876,
-        645: 1261,
-        640: 1698,
-        635: 2260,
-        630: 2974,
-        625: 3813,
-        620: 4699,
-        615: 4901,
-    }
-    
-    # 找到最近的两个点进行插值
-    scores = sorted(score_rank_map.keys())
-    
-    if score >= max(scores):
-        return score_rank_map[max(scores)]
-    if score <= min(scores):
-        return score_rank_map[min(scores)]
-    
-    for i in range(len(scores) - 1):
-        if scores[i] <= score <= scores[i + 1]:
-            # 线性插值
-            x1, y1 = scores[i], score_rank_map[scores[i]]
-            x2, y2 = scores[i + 1], score_rank_map[scores[i + 1]]
-            rank = y1 + (y2 - y1) * (score - x1) / (x2 - x1)
-            return int(rank)
-    
-    return 5000  # 默认值
 
 if __name__ == "__main__":
     import uvicorn
