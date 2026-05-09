@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
+import { Routes, Route, Link, useNavigate } from 'react-router-dom';
 import { Layout, Card, Row, Col, Button, Typography, Space, message } from 'antd';
-import { SearchOutlined, EditOutlined, ArrowLeftOutlined } from '@ant-design/icons';
+import { SearchOutlined, EditOutlined } from '@ant-design/icons';
 import QueryPanel from './components/QueryPanel';
 import DataEntry from './components/DataEntry';
 import StudentForm from './components/StudentForm';
@@ -12,7 +13,9 @@ const { Header, Content, Footer } = Layout;
 const { Title, Paragraph } = Typography;
 
 // ====== 首页 ======
-function HomePage({ onNavigate }) {
+function HomePage() {
+  const navigate = useNavigate();
+
   const features = [
     {
       key: 'query',
@@ -40,7 +43,7 @@ function HomePage({ onNavigate }) {
   return (
     <div style={{ maxWidth: 900, margin: '0 auto' }}>
       <div style={{ textAlign: 'center', marginBottom: 48 }}>
-        <Title level={2}>🎯 云志选 - 2026云南高考志愿决策系统</Title>
+        <Title level={2}>云志选 - 2026云南高考志愿决策系统</Title>
         <Paragraph type="secondary" style={{ fontSize: 16 }}>
           基于历年录取数据的智能志愿填报辅助平台
         </Paragraph>
@@ -62,7 +65,7 @@ function HomePage({ onNavigate }) {
               <Button
                 type="primary"
                 size="large"
-                onClick={() => onNavigate(f.key)}
+                onClick={() => navigate(`/${f.key === 'simulator' ? 'simulator' : f.key === 'query' ? 'query' : 'data-entry'}`)}
                 style={{ borderRadius: 6 }}
               >
                 {f.action}
@@ -76,7 +79,8 @@ function HomePage({ onNavigate }) {
 }
 
 // ====== 志愿模拟填报子页面 ======
-function SimulatorPage({ onBack }) {
+function SimulatorPage() {
+  const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(0);
   const [studentInfo, setStudentInfo] = useState(null);
   const [recommendations, setRecommendations] = useState([]);
@@ -117,47 +121,40 @@ function SimulatorPage({ onBack }) {
   }
 
   return (
-    <div>
-      <div style={{ marginBottom: 24 }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={onBack}>返回首页</Button>
+    <Card>
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 32 }}>
+        {steps.map((s, i) => (
+          <div key={i} style={{
+            display: 'flex', alignItems: 'center',
+            opacity: i <= currentStep ? 1 : 0.35,
+            cursor: i <= currentStep ? 'pointer' : 'default'
+          }} onClick={() => { if (i <= currentStep) setCurrentStep(i); }}>
+            <div style={{
+              width: 32, height: 32, borderRadius: '50%',
+              background: i <= currentStep ? '#1890ff' : '#d9d9d9',
+              color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontWeight: 'bold', fontSize: 14
+            }}>
+              {i + 1}
+            </div>
+            <span style={{ margin: '0 8px', fontSize: 14, color: i <= currentStep ? '#333' : '#bbb' }}>
+              {s.title}
+            </span>
+            {i < steps.length - 1 && (
+              <div style={{
+                width: 40, height: 2,
+                background: i < currentStep ? '#1890ff' : '#e8e8e8',
+                marginRight: 8
+              }} />
+            )}
+          </div>
+        ))}
       </div>
 
-      <Card>
-        {/* Simple step indicator */}
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 32 }}>
-          {steps.map((s, i) => (
-            <div key={i} style={{
-              display: 'flex', alignItems: 'center',
-              opacity: i <= currentStep ? 1 : 0.35,
-              cursor: i <= currentStep ? 'pointer' : 'default'
-            }} onClick={() => { if (i <= currentStep) setCurrentStep(i); }}>
-              <div style={{
-                width: 32, height: 32, borderRadius: '50%',
-                background: i <= currentStep ? '#1890ff' : '#d9d9d9',
-                color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontWeight: 'bold', fontSize: 14
-              }}>
-                {i + 1}
-              </div>
-              <span style={{ margin: '0 8px', fontSize: 14, color: i <= currentStep ? '#333' : '#bbb' }}>
-                {s.title}
-              </span>
-              {i < steps.length - 1 && (
-                <div style={{
-                  width: 40, height: 2,
-                  background: i < currentStep ? '#1890ff' : '#e8e8e8',
-                  marginRight: 8
-                }} />
-              )}
-            </div>
-          ))}
-        </div>
-
-        <div style={{ marginTop: 40 }}>
-          {steps[currentStep].content}
-        </div>
-      </Card>
-    </div>
+      <div style={{ marginTop: 40 }}>
+        {steps[currentStep].content}
+      </div>
+    </Card>
   );
 }
 
@@ -193,61 +190,32 @@ function ExportPlan({ studentInfo, recommendations }) {
 
 // ====== App 根组件 ======
 function App() {
-  const [page, setPage] = useState('home');
-
-  const renderPage = () => {
-    switch (page) {
-      case 'query':
-        return (
-          <div>
-            <div style={{ marginBottom: 24 }}>
-              <Button icon={<ArrowLeftOutlined />} onClick={() => setPage('home')}>返回首页</Button>
-            </div>
-            <QueryPanel />
-          </div>
-        );
-      case 'simulator':
-        return <SimulatorPage onBack={() => setPage('home')} />;
-      case 'data-entry':
-        return (
-          <div>
-            <div style={{ marginBottom: 24 }}>
-              <Button icon={<ArrowLeftOutlined />} onClick={() => setPage('home')}>返回首页</Button>
-            </div>
-            <DataEntry />
-          </div>
-        );
-      default:
-        return <HomePage onNavigate={setPage} />;
-    }
-  };
-
   return (
     <Layout className="layout">
       <Header style={{ background: '#1890ff', padding: '0 50px', display: 'flex', alignItems: 'center' }}>
-        <div style={{ color: 'white', fontSize: 20, fontWeight: 'bold' }}>
-          🎯 云志选
-        </div>
-        {page !== 'home' && (
-          <Space style={{ marginLeft: 32 }}>
-            <Button size="small" ghost onClick={() => setPage('query')}
-              type={page === 'query' ? 'primary' : 'default'}>
-              数据查询
-            </Button>
-            <Button size="small" ghost onClick={() => setPage('simulator')}
-              type={page === 'simulator' ? 'primary' : 'default'}>
-              志愿填报
-            </Button>
-            <Button size="small" ghost onClick={() => setPage('data-entry')}
-              type={page === 'data-entry' ? 'primary' : 'default'}>
-              数据录入
-            </Button>
-          </Space>
-        )}
+        <Link to="/" style={{ color: 'white', fontSize: 20, fontWeight: 'bold', textDecoration: 'none' }}>
+          云志选
+        </Link>
+        <Space style={{ marginLeft: 32 }}>
+          <Link to="/query">
+            <Button size="small" ghost>数据查询</Button>
+          </Link>
+          <Link to="/simulator">
+            <Button size="small" ghost>志愿填报</Button>
+          </Link>
+          <Link to="/data-entry">
+            <Button size="small" ghost>数据录入</Button>
+          </Link>
+        </Space>
       </Header>
 
       <Content style={{ padding: '40px 50px', minHeight: 'calc(100vh - 134px)' }}>
-        {renderPage()}
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/query" element={<QueryPanel />} />
+          <Route path="/simulator" element={<SimulatorPage />} />
+          <Route path="/data-entry" element={<DataEntry />} />
+        </Routes>
       </Content>
 
       <Footer style={{ textAlign: 'center' }}>
