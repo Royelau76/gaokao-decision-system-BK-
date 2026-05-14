@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
 import { Routes, Route, Link, useNavigate } from 'react-router-dom';
-import { Layout, Card, Row, Col, Button, Typography, Space, Drawer, message } from 'antd';
-import { SearchOutlined, EditOutlined, MenuOutlined } from '@ant-design/icons';
+import { ConfigProvider, Layout, Card, Row, Col, Button, Typography, Space, Drawer, message } from 'antd';
+import { SearchOutlined, EditOutlined, MenuOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import QueryPanel from './components/QueryPanel';
 import DataEntry from './components/DataEntry';
 import StudentForm from './components/StudentForm';
 import RecommendationList from './components/RecommendationList';
 import VolunteerTable from './components/VolunteerTable';
+import notionTheme from './notion-theme';
 import './App.css';
 
 const { Header, Content, Footer } = Layout;
-const { Title, Paragraph } = Typography;
+const { Title, Text } = Typography;
 
 // ====== 首页 ======
 function HomePage() {
@@ -20,65 +21,114 @@ function HomePage() {
     {
       key: 'query',
       title: '数据查询',
-      icon: <SearchOutlined style={{ fontSize: 48, color: '#1890ff' }} />,
-      description: '按院校、专业、位次查询历年录取分数和位次信息，快速了解目标院校的录取情况。',
-      action: '进入查询'
+      icon: <SearchOutlined style={{ fontSize: 20, color: '#37352F' }} />,
+      iconBg: '#E8F0FE',
+      description: '按院校、专业、位次查询历年录取分数和位次信息',
+      action: '进入查询',
+      emoji: '🔍'
     },
     {
       key: 'simulator',
       title: '志愿模拟填报',
-      icon: <EditOutlined style={{ fontSize: 48, color: '#52c41a' }} />,
-      description: '录入分数和偏好，系统基于历年数据智能推荐冲/稳/保三层志愿方案，一键导出。',
-      action: '开始填报'
+      icon: <ThunderboltOutlined style={{ fontSize: 20, color: '#37352F' }} />,
+      iconBg: '#E6F7EC',
+      description: '录入分数和偏好，智能推荐冲/稳/保三层志愿方案',
+      action: '开始填报',
+      emoji: '🧠'
     },
     {
       key: 'data-entry',
       title: '数据录入',
-      icon: <EditOutlined style={{ fontSize: 48, color: '#fa8c16' }} />,
-      description: '管理院校信息，录入历年录取分数和一分一段表，支持CSV批量导入导出。',
-      action: '进入录入'
+      icon: <EditOutlined style={{ fontSize: 20, color: '#37352F' }} />,
+      iconBg: '#FEF3E2',
+      description: '管理院校信息，录入历年录取分数和一分一段表',
+      action: '进入录入',
+      emoji: '📋'
     },
   ];
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto' }}>
-      <div style={{ textAlign: 'center', marginBottom: 48 }}>
-        <Title level={2}>云志选 - 2026云南高考志愿决策系统</Title>
-        <Paragraph type="secondary" style={{ fontSize: 16 }}>
-          基于历年录取数据的智能志愿填报辅助平台
-        </Paragraph>
+    <div style={{ maxWidth: 960, margin: '0 auto' }}>
+      {/* 欢迎区 */}
+      <div style={{ marginBottom: 32 }}>
+        <div style={{ fontSize: 12, color: '#B4B4B0', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+          云志选 · 高考志愿决策系统
+        </div>
+        <Title level={2} style={{ margin: 0 }}>欢迎回来</Title>
+        <Text type="secondary" style={{ fontSize: 14, marginTop: 4, display: 'block' }}>
+          2026 云南省物理类考生 · 基于历年录取数据的智能决策
+        </Text>
       </div>
 
-      <Row gutter={24}>
-        {features.map(f => (
-          <Col xs={24} sm={12} key={f.key}>
-            <Card
-              hoverable
-              style={{ textAlign: 'center', height: '100%', borderRadius: 8 }}
-              bodyStyle={{ padding: '32px 24px' }}
-            >
-              <div style={{ marginBottom: 16 }}>{f.icon}</div>
-              <Title level={3}>{f.title}</Title>
-              <Paragraph type="secondary" style={{ minHeight: 60 }}>
-                {f.description}
-              </Paragraph>
-              <Button
-                type="primary"
-                size="large"
-                onClick={() => navigate(`/${f.key === 'simulator' ? 'simulator' : f.key === 'query' ? 'query' : 'data-entry'}`)}
-                style={{ borderRadius: 6 }}
-              >
-                {f.action}
-              </Button>
-            </Card>
+      {/* 数据概览卡片 */}
+      <Row gutter={[12, 12]} style={{ marginBottom: 24 }}>
+        {[
+          { num: 186, label: '可报高校', sub: '云南省物理类 · 本科批', color: '#2F8CFF' },
+          { num: '1,247', label: '可报专业', sub: '含 985/211 院校 43 所', color: '#3CB371' },
+          { num: 8, label: '我的收藏', sub: '3 所待详细对比', color: '#E8A838' },
+        ].map((s, i) => (
+          <Col xs={24} sm={8} key={i}>
+            <div className="notion-stat-card">
+              <div className="notion-stat-num" style={{ color: s.color }}>{s.num}</div>
+              <div className="notion-stat-label">{s.label}</div>
+              <div className="notion-stat-sub">{s.sub}</div>
+            </div>
           </Col>
         ))}
       </Row>
+
+      {/* 功能入口 */}
+      <Row gutter={[12, 12]}>
+        {features.map(f => (
+          <Col xs={24} sm={8} key={f.key}>
+            <div className="notion-action-card" onClick={() => navigate(`/${f.key === 'simulator' ? 'simulator' : f.key === 'query' ? 'query' : 'data-entry'}`)}>
+              <div className="notion-action-icon" style={{ background: f.iconBg }}>
+                {f.icon}
+              </div>
+              <div className="notion-action-body">
+                <div className="notion-action-title">{f.emoji} {f.title}</div>
+                <div className="notion-action-desc">{f.description}</div>
+              </div>
+            </div>
+          </Col>
+        ))}
+      </Row>
+
+      {/* 快速推荐 */}
+      <div style={{ marginTop: 32 }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: '#9B9A97', marginBottom: 8 }}>
+          最近浏览 / 推荐
+        </div>
+        {[
+          { name: '云南大学', tag: '211 · 双一流', loc: '昆明', prob: 85 },
+          { name: '昆明理工大学', tag: '省重点', loc: '昆明', prob: 62 },
+          { name: '浙江大学', tag: '985 · 双一流', loc: '杭州', prob: 12 },
+        ].map((item, i) => (
+          <div className="notion-list-item" key={i} onClick={() => navigate('/query')}>
+            <div className="notion-list-left">
+              <span style={{ fontSize: 16, marginRight: 8 }}>🏛️</span>
+              <span style={{ fontWeight: 500 }}>{item.name}</span>
+              <span className="notion-tag">{item.tag}</span>
+            </div>
+            <div className="notion-list-right">
+              <span style={{ fontSize: 12, color: '#9B9A97' }}>{item.loc}</span>
+              <div className="notion-prob-bar">
+                <div className="notion-prob-fill"
+                  style={{ width: `${item.prob}%`, background: item.prob >= 70 ? '#3CB371' : item.prob >= 40 ? '#E8A838' : '#E25C5C' }}
+                />
+              </div>
+              <span style={{ fontSize: 12, color: item.prob >= 70 ? '#3CB371' : item.prob >= 40 ? '#E8A838' : '#E25C5C' }}>
+                {item.prob >= 70 ? '高概率' : item.prob >= 40 ? '中等概率' : '低概率'}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
-// ====== 志愿模拟填报子页面 ======
+// ====== 志愿模拟填报 ======
 function SimulatorPage() {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(0);
@@ -86,21 +136,9 @@ function SimulatorPage() {
   const [recommendations, setRecommendations] = useState([]);
 
   const steps = [
-    { title: '录入信息', content: (
-      <StudentForm onSubmit={handleStudentSubmit} />
-    )},
-    { title: '智能推荐', content: (
-      <RecommendationList
-        recommendations={recommendations}
-        onGenerateVolunteerTable={() => setCurrentStep(2)}
-      />
-    )},
-    { title: '志愿方案', content: (
-      <VolunteerTable studentInfo={studentInfo} recommendations={recommendations} />
-    )},
-    { title: '导出方案', content: (
-      <ExportPlan studentInfo={studentInfo} recommendations={recommendations} />
-    )},
+    { title: '录入信息', content: <StudentForm onSubmit={handleStudentSubmit} /> },
+    { title: '智能推荐', content: <RecommendationList recommendations={recommendations} onGenerateVolunteerTable={() => setCurrentStep(2)} /> },
+    { title: '志愿方案', content: <VolunteerTable studentInfo={studentInfo} recommendations={recommendations} /> },
   ];
 
   async function handleStudentSubmit(values) {
@@ -121,119 +159,116 @@ function SimulatorPage() {
   }
 
   return (
-    <Card>
-      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 32 }}>
+    <div style={{ maxWidth: 800, margin: '0 auto' }}>
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ fontSize: 12, color: '#B4B4B0', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
+          志愿填报
+        </div>
+        <Title level={3} style={{ margin: 0 }}>模拟填报</Title>
+      </div>
+
+      {/* Notion 风格步骤条 */}
+      <div className="notion-steps">
         {steps.map((s, i) => (
-          <div key={i} style={{
-            display: 'flex', alignItems: 'center',
-            opacity: i <= currentStep ? 1 : 0.35,
-            cursor: i <= currentStep ? 'pointer' : 'default'
-          }} onClick={() => { if (i <= currentStep) setCurrentStep(i); }}>
-            <div style={{
-              width: 32, height: 32, borderRadius: '50%',
-              background: i <= currentStep ? '#1890ff' : '#d9d9d9',
-              color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontWeight: 'bold', fontSize: 14
-            }}>
-              {i + 1}
+          <React.Fragment key={i}>
+            <div
+              className={`notion-step ${i <= currentStep ? 'active' : ''} ${i < currentStep ? 'done' : ''}`}
+              onClick={() => { if (i <= currentStep) setCurrentStep(i); }}
+            >
+              <div className="notion-step-circle">
+                {i < currentStep ? '✓' : i + 1}
+              </div>
+              <div className="notion-step-label">{s.title}</div>
             </div>
-            <span style={{ margin: '0 8px', fontSize: 14, color: i <= currentStep ? '#333' : '#bbb' }}>
-              {s.title}
-            </span>
-            {i < steps.length - 1 && (
-              <div style={{
-                width: 40, height: 2,
-                background: i < currentStep ? '#1890ff' : '#e8e8e8',
-                marginRight: 8
-              }} />
-            )}
-          </div>
+            {i < steps.length - 1 && <div className={`notion-step-line ${i < currentStep ? 'done' : ''}`} />}
+          </React.Fragment>
         ))}
       </div>
 
-      <div style={{ marginTop: 40 }}>
+      <div style={{ marginTop: 32 }}>
         {steps[currentStep].content}
       </div>
-    </Card>
-  );
-}
-
-function ExportPlan({ studentInfo, recommendations }) {
-  const handleExport = () => {
-    const data = {
-      studentInfo,
-      recommendations,
-      exportTime: new Date().toISOString()
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `志愿方案_${studentInfo?.score}分_${new Date().toLocaleDateString()}.json`;
-    a.click();
-    message.success('方案已导出！');
-  };
-
-  return (
-    <div style={{ textAlign: 'center', padding: '40px' }}>
-      <h2>导出志愿方案</h2>
-      <p>将您的志愿方案保存到本地</p>
-      <button onClick={handleExport} style={{
-        padding: '10px 30px', fontSize: '16px', background: '#1890ff',
-        color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer'
-      }}>
-        导出JSON文件
-      </button>
     </div>
   );
 }
 
-// ====== App 根组件 ======
+// ====== App ======
 function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const navLinks = [
+    { to: '/', label: '首页' },
     { to: '/query', label: '数据查询' },
     { to: '/simulator', label: '志愿填报' },
     { to: '/data-entry', label: '数据录入' },
   ];
 
   return (
-    <Layout className="layout">
-      <Header style={{ background: '#1890ff', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Link to="/" style={{ color: 'white', fontSize: 20, fontWeight: 'bold', textDecoration: 'none' }}>
-          云志选
-        </Link>
-        <Space className="desktop-nav">
+    <ConfigProvider theme={notionTheme}>
+      <Layout style={{ minHeight: '100vh' }}>
+        {/* Notion 风格顶栏 */}
+        <Header className="notion-app-header">
+          <Link to="/" className="notion-app-logo">
+            <span className="notion-app-logo-icon">云</span>
+            <span className="notion-app-logo-text">云志选</span>
+          </Link>
+
+          <Space size={2} className="notion-desktop-nav">
+            {navLinks.map(n => (
+              <Link key={n.to} to={n.to} className={`notion-nav-link ${window.location.pathname === n.to ? 'active' : ''}`}>
+                {n.label}
+              </Link>
+            ))}
+          </Space>
+
+          <Button
+            type="text"
+            icon={<MenuOutlined />}
+            className="notion-mobile-btn"
+            onClick={() => setDrawerOpen(true)}
+          />
+        </Header>
+
+        <Drawer
+          title={<span style={{ fontWeight: 500 }}>云志选</span>}
+          placement="right"
+          onClose={() => setDrawerOpen(false)}
+          open={drawerOpen}
+          width={220}
+          bodyStyle={{ padding: 8 }}
+        >
           {navLinks.map(n => (
-            <Link key={n.to} to={n.to}>
-              <Button size="small" ghost>{n.label}</Button>
+            <Link key={n.to} to={n.to} style={{
+              display: 'block', padding: '8px 12px', borderRadius: 4,
+              color: window.location.pathname === n.to ? '#2F8CFF' : '#37352F',
+              background: window.location.pathname === n.to ? '#E8F0FE' : 'transparent',
+              fontSize: 14, marginBottom: 2, textDecoration: 'none',
+            }} onClick={() => setDrawerOpen(false)}>
+              {n.label}
             </Link>
           ))}
-        </Space>
-        <Button className="mobile-nav-btn" type="text" icon={<MenuOutlined />} style={{ color: 'white', fontSize: 18 }} onClick={() => setDrawerOpen(true)} />
-      </Header>
+        </Drawer>
 
-      <Drawer title="导航" placement="right" onClose={() => setDrawerOpen(false)} open={drawerOpen} width={200}>
-        {navLinks.map(n => (
-          <p key={n.to} style={{ margin: '12px 0' }}>
-            <Link to={n.to} onClick={() => setDrawerOpen(false)}>{n.label}</Link>
-          </p>
-        ))}
-      </Drawer>
+        <Content style={{ padding: '32px 24px', background: '#F7F6F3' }}>
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/query" element={<QueryPanel />} />
+            <Route path="/simulator" element={<SimulatorPage />} />
+            <Route path="/data-entry" element={<DataEntry />} />
+          </Routes>
+        </Content>
 
-      <Content style={{ padding: '40px 50px', minHeight: 'calc(100vh - 134px)' }}>
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/query" element={<QueryPanel />} />
-          <Route path="/simulator" element={<SimulatorPage />} />
-          <Route path="/data-entry" element={<DataEntry />} />
-        </Routes>
-      </Content>
-
-      <Footer style={{ textAlign: 'center' }}>
-        云志选 ©2026 Created for 云南高考考生
-      </Footer>
-    </Layout>
+        <Footer style={{
+          textAlign: 'center',
+          padding: '16px 24px',
+          fontSize: 12,
+          color: '#B4B4B0',
+          borderTop: '1px solid #EBE9E4',
+          background: '#F7F6F3',
+        }}>
+          云志选 ©2026 · 云南高考志愿决策系统
+        </Footer>
+      </Layout>
+    </ConfigProvider>
   );
 }
 

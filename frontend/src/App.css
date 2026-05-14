@@ -1,56 +1,308 @@
-@import '~antd/dist/reset.css';
+/* ═══════════════════════════════════════
+   云志选 · Notion 风格覆盖
+   ═══════════════════════════════════════ */
 
-.layout {
-  min-height: 100vh;
+/* ─── 全局 ─── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-.logo {
-  float: left;
-  color: white;
-  font-size: 20px;
-  font-weight: bold;
+/* ─── 顶栏 ─── */
+.notion-app-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  height: 48px !important;
+  line-height: 48px !important;
+  padding: 0 20px !important;
+  background: #FFFFFF !important;
+  border-bottom: 1px solid #EBE9E4;
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
-
-.steps-content {
-  min-height: 400px;
-  margin-top: 16px;
-  padding: 20px;
-  background-color: #fafafa;
-  border: 1px dashed #e9e9e9;
-  border-radius: 8px;
-}
-
-.ant-card {
-  margin-bottom: 16px;
-}
-
-/* Desktop nav always visible, mobile nav hidden */
-.desktop-nav {
+.notion-app-logo {
   display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+}
+.notion-app-logo-icon {
+  width: 22px;
+  height: 22px;
+  background: #37352F;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+.notion-app-logo-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: #37352F;
 }
 
-.mobile-nav-btn {
-  display: none;
+/* ─── 导航 ─── */
+.notion-desktop-nav { display: flex !important; }
+.notion-mobile-btn { display: none !important; }
+
+.notion-nav-link {
+  font-size: 13px;
+  color: #9B9A97 !important;
+  text-decoration: none;
+  padding: 3px 10px;
+  border-radius: 4px;
+  transition: background 0.15s, color 0.15s;
+}
+.notion-nav-link:hover {
+  background: #EBE9E4 !important;
+  color: #37352F !important;
+}
+.notion-nav-link.active {
+  background: #E8F0FE !important;
+  color: #2F8CFF !important;
 }
 
-@media (max-width: 768px) {
-  .desktop-nav {
-    display: none !important;
-  }
+@media (max-width: 640px) {
+  .notion-desktop-nav { display: none !important; }
+  .notion-mobile-btn { display: inline-flex !important; }
+}
+@media (min-width: 641px) {
+  .notion-mobile-btn { display: none !important; }
+}
 
-  .mobile-nav-btn {
-    display: inline-flex !important;
-  }
+/* ─── 统计卡片 ─── */
+.notion-stat-card {
+  background: #FFFFFF;
+  border: 1px solid #EBE9E4;
+  border-radius: 4px;
+  padding: 20px;
+}
+.notion-stat-num {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.1;
+  margin-bottom: 4px;
+}
+.notion-stat-label {
+  font-size: 13px;
+  color: #9B9A97;
+}
+.notion-stat-sub {
+  font-size: 12px;
+  color: #B4B4B0;
+  margin-top: 8px;
+}
 
-  .ant-layout-header {
-    padding: 0 16px !important;
-  }
+/* ─── 功能入口卡片 ─── */
+.notion-action-card {
+  background: #FFFFFF;
+  border: 1px solid #EBE9E4;
+  border-radius: 4px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+  height: 100%;
+}
+.notion-action-card:hover {
+  background: #F1F0EB;
+}
+.notion-action-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.notion-action-body {
+  flex: 1;
+  min-width: 0;
+}
+.notion-action-title {
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.notion-action-desc {
+  font-size: 12px;
+  color: #9B9A97;
+  margin-top: 2px;
+  line-height: 1.4;
+}
 
-  .ant-layout-content {
-    padding: 16px !important;
-  }
+/* ─── 列表项 ─── */
+.notion-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: #FFFFFF;
+  border: 1px solid #EBE9E4;
+  border-top: none;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.notion-list-item:first-of-type {
+  border-radius: 4px 4px 0 0;
+  border-top: 1px solid #EBE9E4;
+}
+.notion-list-item:last-of-type {
+  border-radius: 0 0 4px 4px;
+}
+.notion-list-item:only-of-type {
+  border-radius: 4px;
+}
+.notion-list-item:hover {
+  background: #F1F0EB;
+}
+.notion-list-left {
+  display: flex;
+  align-items: center;
+}
+.notion-list-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+}
+.notion-tag {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: #EBE9E4;
+  color: #9B9A97;
+  margin-left: 8px;
+  white-space: nowrap;
+}
+.notion-prob-bar {
+  width: 60px;
+  height: 6px;
+  background: #EBE9E4;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.notion-prob-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s;
+}
 
-  .ant-steps {
-    font-size: 12px;
-  }
+/* ─── 步骤条 ─── */
+.notion-steps {
+  display: flex;
+  align-items: center;
+}
+.notion-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  opacity: 0.35;
+  user-select: none;
+  transition: opacity 0.2s;
+}
+.notion-step.active, .notion-step.done {
+  opacity: 1;
+}
+.notion-step-circle {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  background: #EBE9E4;
+  color: #9B9A97;
+  flex-shrink: 0;
+}
+.notion-step.active .notion-step-circle {
+  background: #2F8CFF;
+  color: #fff;
+}
+.notion-step.done .notion-step-circle {
+  background: #3CB371;
+  color: #fff;
+}
+.notion-step-label {
+  font-size: 13px;
+  color: #37352F;
+  white-space: nowrap;
+}
+.notion-step-line {
+  width: 40px;
+  height: 2px;
+  background: #EBE9E4;
+  margin: 0 8px;
+  flex-shrink: 0;
+}
+.notion-step-line.done {
+  background: #3CB371;
+}
+
+/* ─── Ant Design 覆盖 ─── */
+.ant-card {
+  border: 1px solid #EBE9E4 !important;
+  box-shadow: none !important;
+}
+.ant-card-head {
+  border-bottom: 1px solid #EBE9E4 !important;
+}
+.ant-table-thead > tr > th {
+  background: #F7F6F3 !important;
+  color: #B4B4B0 !important;
+  font-weight: 600 !important;
+  font-size: 11px !important;
+  border-bottom: 1px solid #EBE9E4 !important;
+}
+.ant-table-tbody > tr > td {
+  border-bottom: 1px solid #EBE9E4 !important;
+}
+.ant-table-tbody > tr:hover > td {
+  background: #F1F0EB !important;
+}
+
+/* ─── Ant Design Steps 覆盖 ─── */
+.ant-steps-item-wait .ant-steps-item-icon {
+  background: #EBE9E4 !important;
+  border-color: #EBE9E4 !important;
+}
+.ant-steps-item-finish .ant-steps-item-icon {
+  background: #3CB371 !important;
+  border-color: #3CB371 !important;
+}
+.ant-steps-item-process .ant-steps-item-icon {
+  background: #2F8CFF !important;
+  border-color: #2F8CFF !important;
+}
+
+/* ─── 滚动条 ─── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #D0CFCC;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #B4B4B0;
 }
