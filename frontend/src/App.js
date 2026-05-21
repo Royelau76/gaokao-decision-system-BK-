@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Routes, Route, Link, useNavigate } from 'react-router-dom';
 import { ConfigProvider, Layout, Card, Row, Col, Button, Typography, Space, Drawer, message } from 'antd';
 import { SearchOutlined, EditOutlined, MenuOutlined, ThunderboltOutlined } from '@ant-design/icons';
@@ -16,6 +16,13 @@ const { Title, Text } = Typography;
 // ====== 首页 ======
 function HomePage() {
   const navigate = useNavigate();
+  const [stats, setStats] = useState(null);
+  const [hotUnis, setHotUnis] = useState([]);
+
+  useEffect(() => {
+    fetch('/api/stats').then(r => r.json()).then(setStats).catch(() => {});
+    fetch('/api/hot-universities?limit=6').then(r => r.json()).then(setHotUnis).catch(() => {});
+  }, []);
 
   const features = [
     {
@@ -47,6 +54,12 @@ function HomePage() {
     },
   ];
 
+  const statCards = [
+    { num: stats ? stats.university_count : '—', label: '可报高校', sub: stats ? `云南省物理类 · ${stats.year}年` : '加载中...', color: '#2F8CFF' },
+    { num: stats ? stats.major_count : '—', label: '可报专业', sub: stats ? `含 985/211 院校 ${stats.elite_count} 所` : '加载中...', color: '#3CB371' },
+    { num: stats ? stats.plan_university_count : '—', label: '招生计划', sub: stats ? `${stats.year}年本科批B段` : '加载中...', color: '#E8A838' },
+  ];
+
   return (
     <div style={{ maxWidth: 960, margin: '0 auto' }}>
       {/* 欢迎区 */}
@@ -62,11 +75,7 @@ function HomePage() {
 
       {/* 数据概览卡片 */}
       <Row gutter={[12, 12]} style={{ marginBottom: 24 }}>
-        {[
-          { num: 186, label: '可报高校', sub: '云南省物理类 · 本科批', color: '#2F8CFF' },
-          { num: '1,247', label: '可报专业', sub: '含 985/211 院校 43 所', color: '#3CB371' },
-          { num: 8, label: '我的收藏', sub: '3 所待详细对比', color: '#E8A838' },
-        ].map((s, i) => (
+        {statCards.map((s, i) => (
           <Col xs={24} sm={8} key={i}>
             <div className="notion-stat-card">
               <div className="notion-stat-num" style={{ color: s.color }}>{s.num}</div>
@@ -94,36 +103,27 @@ function HomePage() {
         ))}
       </Row>
 
-      {/* 快速推荐 */}
-      <div style={{ marginTop: 32 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: '#9B9A97', marginBottom: 8 }}>
-          最近浏览 / 推荐
-        </div>
-        {[
-          { name: '云南大学', tag: '211 · 双一流', loc: '昆明', prob: 85 },
-          { name: '昆明理工大学', tag: '省重点', loc: '昆明', prob: 62 },
-          { name: '浙江大学', tag: '985 · 双一流', loc: '杭州', prob: 12 },
-        ].map((item, i) => (
-          <div className="notion-list-item" key={i} onClick={() => navigate('/query')}>
-            <div className="notion-list-left">
-              <span style={{ fontSize: 16, marginRight: 8 }}>🏛️</span>
-              <span style={{ fontWeight: 500 }}>{item.name}</span>
-              <span className="notion-tag">{item.tag}</span>
-            </div>
-            <div className="notion-list-right">
-              <span style={{ fontSize: 12, color: '#9B9A97' }}>{item.loc}</span>
-              <div className="notion-prob-bar">
-                <div className="notion-prob-fill"
-                  style={{ width: `${item.prob}%`, background: item.prob >= 70 ? '#3CB371' : item.prob >= 40 ? '#E8A838' : '#E25C5C' }}
-                />
-              </div>
-              <span style={{ fontSize: 12, color: item.prob >= 70 ? '#3CB371' : item.prob >= 40 ? '#E8A838' : '#E25C5C' }}>
-                {item.prob >= 70 ? '高概率' : item.prob >= 40 ? '中等概率' : '低概率'}
-              </span>
-            </div>
+      {/* 热门院校 */}
+      {hotUnis.length > 0 && (
+        <div style={{ marginTop: 32 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#9B9A97', marginBottom: 8 }}>
+            热门院校
           </div>
-        ))}
-      </div>
+          {hotUnis.map((item, i) => (
+            <div className="notion-list-item" key={i} onClick={() => navigate('/query')}>
+              <div className="notion-list-left">
+                <span style={{ fontSize: 16, marginRight: 8 }}>🏛️</span>
+                <span style={{ fontWeight: 500 }}>{item.university_name}</span>
+                <span className="notion-tag">{item.level}</span>
+              </div>
+              <div className="notion-list-right">
+                <span style={{ fontSize: 12, color: '#9B9A97' }}>{item.province}</span>
+                <span style={{ fontSize: 12, color: '#37352F' }}>最低 {item.min_score} 分 / {item.min_rank} 名</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

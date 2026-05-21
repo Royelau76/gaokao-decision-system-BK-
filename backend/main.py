@@ -292,6 +292,69 @@ async def get_universities(
     conn.close()
     return universities
 
+@app.get("/api/stats")
+async def get_stats(year: Optional[int] = None):
+    """首页统计数据"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    if year is None:
+        cursor.execute("SELECT MAX(year) FROM yunnan_physics_scores")
+        row = cursor.fetchone()
+        year = row[0] if row else 2025
+
+    cursor.execute("SELECT COUNT(DISTINCT university_id) FROM yunnan_physics_scores WHERE year=?", (year,))
+    uni_count = cursor.fetchone()[0]
+
+    cursor.execute("SELECT COUNT(DISTINCT major_category) FROM yunnan_physics_scores WHERE year=?", (year,))
+    major_count = cursor.fetchone()[0]
+
+    cursor.execute("SELECT COUNT(*) FROM universities WHERE level IN ('985','211','双一流')")
+    elite_count = cursor.fetchone()[0]
+
+    cursor.execute("SELECT COUNT(DISTINCT university_id) FROM yunnan_plan_data WHERE year=?", (year,))
+    plan_uni_count = cursor.fetchone()[0]
+
+    conn.close()
+
+    return {
+        "university_count": uni_count,
+        "major_count": major_count,
+        "elite_count": elite_count,
+        "plan_university_count": plan_uni_count,
+        "year": year,
+    }
+
+@app.get("/api/hot-universities")
+async def get_hot_universities(year: Optional[int] = None, limit: int = 5):
+    """首页热门院校（按最低分排序的知名院校）"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    if year is None:
+        cursor.execute("SELECT MAX(year) FROM yunnan_physics_scores")
+        row = cursor.fetchone()
+        year = row[0] if row else 2025
+
+    cursor.execute("""
+        SELECT s.university_id, s.university_name, u.level, u.province,
+               MIN(s.min_score) as min_score, MIN(s.min_rank) as min_rank
+        FROM yunnan_physics_scores s
+        JOIN universities u ON s.university_id = u.id
+        WHERE s.year=? AND u.level IN ('985','211','双一流')
+        GROUP BY s.university_id, s.university_name, u.level, u.province
+        ORDER BY min_score DESC
+        LIMIT ?
+    """, (year, limit))
+
+    results = []
+    for row in cursor.fetchall():
+        r = dict(row)
+        results.append(r)
+
+    conn.close()
+    return results
+
 @app.post("/api/recommendations")
 async def get_recommendations(student: StudentInfo):
     """获取智能推荐"""
