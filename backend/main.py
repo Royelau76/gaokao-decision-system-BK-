@@ -30,7 +30,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="云志选 - 云南高考志愿决策系统",
     description="2026年云南省高考志愿填报智能决策支持系统",
-    version="1.0.0",
+    version="1.1.0",
     lifespan=lifespan
 )
 
