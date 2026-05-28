@@ -56,9 +56,9 @@ class StudentInfo(BaseModel):
     """考生信息"""
     score: int                    # 高考总分
     rank: int                     # 全省位次
-    subjects: List[str]           # 选科组合
-    preference_region: List[str]  # 偏好地区
-    preference_major: List[str]   # 偏好专业
+    subjects: Optional[List[str]] = []           # 选科组合
+    preference_region: Optional[List[str]] = []  # 偏好地区
+    preference_major: Optional[List[str]] = []   # 偏好专业
     risk_tolerance: str           # 风险偏好：激进/稳健/保守
     year: Optional[int] = None    # 参考年份，默认取最新
 
@@ -249,6 +249,70 @@ def init_database():
     )
     ''')
 
+    # 院校标签表
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS uni_tags (
+        uni_id TEXT NOT NULL,
+        tag_type TEXT NOT NULL,
+        tag_value TEXT NOT NULL,
+        PRIMARY KEY (uni_id, tag_type, tag_value)
+    )
+    ''')
+
+    # 专业就业产出表（三层可信度体系）
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS major_outcomes (
+        uni_id TEXT NOT NULL,
+        major_category TEXT NOT NULL,
+        year INTEGER NOT NULL,
+
+        employment_rate REAL,
+        employment_rate_source TEXT,
+        employment_rate_official INTEGER DEFAULT 0,
+        employment_rate_definition TEXT,
+
+        salary_range TEXT,
+        salary_source TEXT,
+        salary_estimated INTEGER DEFAULT 1,
+
+        grad_rate REAL,
+        grad_rate_source TEXT,
+        grad_rate_official INTEGER DEFAULT 0,
+        grad_rate_note TEXT,
+
+        top_employers TEXT,
+        employer_source TEXT,
+
+        data_confidence TEXT DEFAULT 'L2',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+        PRIMARY KEY (uni_id, major_category, year)
+    )
+    ''')
+
+    # 专业大类映射表（三层分类：Layer1 大类 → Layer2 核心专业 → 方向标签）
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS major_category_map (
+        original_category TEXT NOT NULL,
+        layer1 TEXT NOT NULL,
+        layer2 TEXT NOT NULL,
+        direction_tags TEXT,
+        PRIMARY KEY (original_category)
+    )
+    ''')
+
+    # 风险预警表
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS risk_alerts (
+        uni_id TEXT NOT NULL,
+        major_category TEXT NOT NULL,
+        risk_type TEXT NOT NULL,
+        risk_desc TEXT,
+        severity TEXT NOT NULL DEFAULT 'mid',
+        PRIMARY KEY (uni_id, major_category, risk_type)
+    )
+    ''')
+
     conn.commit()
     conn.close()
 
@@ -376,6 +440,168 @@ async def get_recommendations(student: StudentInfo):
         }
     }
 
+@app.post("/api/decision/analyze")
+async def decision_analyze(student: StudentInfo):
+    """多维度推荐分析 — 在推荐基础上叠加标签、就业、风险数据"""
+    base_recs = calculate_recommendations(student)
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    enhanced = []
+    for rec in base_recs:
+        uni_id = rec.get("university_id", "")
+        major = rec.get("major", "")
+
+        # 院校标签
+        cursor.execute("SELECT tag_type, tag_value FROM uni_tags WHERE uni_id=?", (uni_id,))
+        tags = [{"type": r[0], "value": r[1]} for r in cursor.fetchall()]
+
+        # 就业产出
+        emp_row, direction_tags = _query_major_outcomes(cursor, uni_id, major)
+        employment = _build_employment_dict(emp_row, direction_tags)
+
+        # 风险预警
+        cursor.execute(
+            "SELECT risk_type, risk_desc, severity FROM risk_alerts WHERE uni_id=? AND major_category=?",
+            (uni_id, major))
+        risks = [{"type": r[0], "desc": r[1], "severity": r[2]} for r in cursor.fetchall()]
+
+        # 综合评分（位次匹配40% + 就业前景30% + 风险系数30%）
+        prob = rec.get("admission_probability", 50)
+        emp_score = 50
+        if employment:
+            emp_rate = employment.get("employment_rate") or 0
+            grad = employment.get("grad_rate") or 0
+            salary_range = employment.get("salary_range") or ""
+
+            # 薪资区间映射为分值
+            salary_map = {
+                "18000+": 90, "15000-18000": 75, "12000-15000": 60,
+                "9000-12000": 45, "6000-9000": 30, "0-6000": 15,
+            }
+            sal_score = salary_map.get(salary_range, 50)
+            # 非官方数据降权
+            if employment.get("salary_estimated"):
+                sal_score = sal_score * 0.85
+
+            emp_score = min(100, emp_rate * 0.35 + grad * 0.25 + sal_score * 0.4)
+        risk_penalty = sum(10 if r["severity"] == "high" else 5 if r["severity"] == "mid" else 2 for r in risks)
+
+        composite = max(0, min(100, prob * 0.4 + emp_score * 0.3 + max(0, 30 - risk_penalty) * 0.3))
+
+        # 推荐理由模板
+        reasons = []
+        level_tags = [t["value"] for t in tags if t["type"] == "level"]
+        if level_tags:
+            reasons.append(f"院校层次：{'/'.join(level_tags)}")
+        rank_diff = student.rank - (rec.get("min_rank") or 0)
+        if rank_diff > 0:
+            reasons.append(f"位次匹配：考生位次高于该校最低位次{rank_diff}名")
+        else:
+            reasons.append(f"位次差距：考生位次低于该校最低位次{abs(rank_diff)}名，需冲刺")
+        if employment and employment.get("salary_range"):
+            sal_label = f"月薪区间{employment['salary_range']}元"
+            if employment.get("salary_estimated"):
+                sal_label += "（行业估算）"
+            reasons.append(f"就业前景：{sal_label}")
+        if employment and employment.get("employment_rate"):
+            emp_label = f"就业率{employment['employment_rate']}%"
+            if employment.get("employment_rate_official"):
+                emp_label += "（学校官方）"
+            reasons.append(emp_label)
+        if risks:
+            high_risks = [r["desc"] for r in risks if r["severity"] == "high"]
+            if high_risks:
+                reasons.append(f"风险提示：{'; '.join(high_risks)}")
+
+        enhanced.append({
+            **rec,
+            "tags": tags,
+            "employment": employment,
+            "risks": risks,
+            "composite_score": round(composite, 1),
+            "reason": "; ".join(reasons) if reasons else "基础位次匹配推荐",
+        })
+
+    conn.close()
+
+    # 汇总
+    chong = [r for r in enhanced if r["level"] == "冲"]
+    wen = [r for r in enhanced if r["level"] == "稳"]
+    bao = [r for r in enhanced if r["level"] == "保"]
+
+    avg_salary = None
+    salaries = [r["employment"]["avg_salary"] for r in enhanced if r.get("employment") and r["employment"].get("avg_salary")]
+    if salaries:
+        avg_salary = round(sum(salaries) / len(salaries))
+
+    top_risks = []
+    for r in enhanced:
+        for rk in r.get("risks", []):
+            if rk["severity"] == "high":
+                top_risks.append(f"{r['university_name']}-{rk['desc']}")
+
+    return {
+        "status": "success",
+        "recommendations": enhanced,
+        "tiers": {"冲": chong, "稳": wen, "保": bao},
+        "summary": {
+            "冲": len(chong),
+            "稳": len(wen),
+            "保": len(bao),
+            "avg_salary": avg_salary,
+            "top_risks": top_risks[:5],
+        }
+    }
+
+@app.post("/api/decision/compare")
+async def decision_compare(ids: List[str]):
+    """多校对比 — 输入格式: ["uni_id|major", ...]"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    results = []
+    for item_id in ids[:4]:  # 最多4个
+        parts = item_id.split("|")
+        if len(parts) != 2:
+            continue
+        uni_id, major = parts[0], parts[1]
+
+        # 录取分数
+        cursor.execute(
+            "SELECT year, min_score, min_rank, max_score, avg_score, enrollment_count FROM yunnan_physics_scores WHERE university_id=? AND major_category=? ORDER BY year DESC LIMIT 3",
+            (uni_id, major))
+        scores = [dict(r) for r in cursor.fetchall()]
+
+        # 标签
+        cursor.execute("SELECT tag_type, tag_value FROM uni_tags WHERE uni_id=?", (uni_id,))
+        tags = [{"type": r[0], "value": r[1]} for r in cursor.fetchall()]
+
+        # 就业
+        emp_row, direction_tags = _query_major_outcomes(cursor, uni_id, major)
+        employment = _build_employment_dict(emp_row, direction_tags)
+        if employment:
+            employment["year"] = None
+
+        # 风险
+        cursor.execute(
+            "SELECT risk_type, risk_desc, severity FROM risk_alerts WHERE uni_id=? AND major_category=?",
+            (uni_id, major))
+        risks = [{"type": r[0], "desc": r[1], "severity": r[2]} for r in cursor.fetchall()]
+
+        results.append({
+            "uni_id": uni_id,
+            "major": major,
+            "tags": tags,
+            "scores": scores,
+            "employment": employment,
+            "risks": risks,
+        })
+
+    conn.close()
+    return {"results": results}
+
 @app.post("/api/volunteer-plans")
 async def create_volunteer_plan(plan: VolunteerPlan):
     """创建志愿方案"""
@@ -448,6 +674,65 @@ def convert_score_to_rank(score: int, year: Optional[int] = None) -> tuple:
     if higher:
         return higher['cumulative_count'], year
     return 5000, year
+
+def _query_major_outcomes(cursor, uni_id: str, major: str):
+    """查询就业数据：通过映射表找 Layer1，再查 major_outcomes"""
+    # 先通过映射表找 Layer1 大类
+    cursor.execute(
+        "SELECT layer1, direction_tags FROM major_category_map WHERE original_category=?",
+        (major,))
+    map_row = cursor.fetchone()
+    layer1 = major  # fallback: 用原值
+    direction_tags = None
+    if map_row:
+        layer1 = map_row[0]
+        direction_tags = map_row[1]
+
+    # 用 Layer1 查 major_outcomes
+    cursor.execute(
+        "SELECT employment_rate, employment_rate_source, employment_rate_official, "
+        "employment_rate_definition, salary_range, salary_source, salary_estimated, "
+        "grad_rate, grad_rate_source, grad_rate_official, grad_rate_note, "
+        "top_employers, employer_source, data_confidence "
+        "FROM major_outcomes WHERE uni_id=? AND major_category=? ORDER BY year DESC LIMIT 1",
+        (uni_id, layer1))
+    row = cursor.fetchone()
+    if row:
+        return row, direction_tags
+
+    # 无匹配时尝试模糊前缀
+    cursor.execute(
+        "SELECT employment_rate, employment_rate_source, employment_rate_official, "
+        "employment_rate_definition, salary_range, salary_source, salary_estimated, "
+        "grad_rate, grad_rate_source, grad_rate_official, grad_rate_note, "
+        "top_employers, employer_source, data_confidence "
+        "FROM major_outcomes WHERE uni_id=? AND ? LIKE major_category||'%' ORDER BY year DESC LIMIT 1",
+        (uni_id, layer1))
+    row = cursor.fetchone()
+    return row, direction_tags
+
+def _build_employment_dict(row, direction_tags=None):
+    """从 major_outcomes 行构建 employment dict"""
+    if not row:
+        return None
+    result = {
+        "employment_rate": row[0],
+        "employment_rate_source": row[1],
+        "employment_rate_official": bool(row[2]),
+        "employment_rate_definition": row[3],
+        "salary_range": row[4],
+        "salary_source": row[5],
+        "salary_estimated": bool(row[6]),
+        "grad_rate": row[7],
+        "grad_rate_source": row[8],
+        "grad_rate_official": bool(row[9]),
+        "grad_rate_note": row[10],
+        "top_employers": json.loads(row[11]) if row[11] else [],
+        "employer_source": row[12],
+        "data_confidence": row[13],
+        "direction_tags": direction_tags.split(',') if direction_tags else [],
+    }
+    return result
 
 def calculate_recommendations(student: StudentInfo) -> List[RecommendationResult]:
     score = student.score
