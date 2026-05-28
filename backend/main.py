@@ -301,7 +301,7 @@ def init_database():
     )
     ''')
 
-    # 风险预警表
+    # 风险预警表（三层可信度体系，与 major_outcomes 对齐）
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS risk_alerts (
         uni_id TEXT NOT NULL,
@@ -309,7 +309,13 @@ def init_database():
         risk_type TEXT NOT NULL,
         risk_desc TEXT,
         severity TEXT NOT NULL DEFAULT 'mid',
-        PRIMARY KEY (uni_id, major_category, risk_type)
+        risk_source TEXT,
+        risk_official INTEGER DEFAULT 0,
+        data_confidence TEXT DEFAULT 'L2',
+        year INTEGER DEFAULT 2025,
+        direction_tags TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (uni_id, major_category, risk_type, year)
     )
     ''')
 
@@ -463,9 +469,13 @@ async def decision_analyze(student: StudentInfo):
 
         # 风险预警
         cursor.execute(
-            "SELECT risk_type, risk_desc, severity FROM risk_alerts WHERE uni_id=? AND major_category=?",
+            "SELECT risk_type, risk_desc, severity, risk_source, risk_official, "
+            "data_confidence, year, direction_tags FROM risk_alerts WHERE uni_id=? AND major_category=? "
+            "ORDER BY year DESC, severity",
             (uni_id, major))
-        risks = [{"type": r[0], "desc": r[1], "severity": r[2]} for r in cursor.fetchall()]
+        risks = [{"type": r[0], "desc": r[1], "severity": r[2], "source": r[3],
+                  "official": bool(r[4]), "confidence": r[5], "year": r[6],
+                  "direction_tags": r[7].split(',') if r[7] else []} for r in cursor.fetchall()]
 
         # 综合评分（位次匹配40% + 就业前景30% + 风险系数30%）
         prob = rec.get("admission_probability", 50)
@@ -586,9 +596,13 @@ async def decision_compare(ids: List[str]):
 
         # 风险
         cursor.execute(
-            "SELECT risk_type, risk_desc, severity FROM risk_alerts WHERE uni_id=? AND major_category=?",
+            "SELECT risk_type, risk_desc, severity, risk_source, risk_official, "
+            "data_confidence, year, direction_tags FROM risk_alerts WHERE uni_id=? AND major_category=? "
+            "ORDER BY year DESC, severity",
             (uni_id, major))
-        risks = [{"type": r[0], "desc": r[1], "severity": r[2]} for r in cursor.fetchall()]
+        risks = [{"type": r[0], "desc": r[1], "severity": r[2], "source": r[3],
+                  "official": bool(r[4]), "confidence": r[5], "year": r[6],
+                  "direction_tags": r[7].split(',') if r[7] else []} for r in cursor.fetchall()]
 
         results.append({
             "uni_id": uni_id,
