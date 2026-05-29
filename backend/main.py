@@ -468,14 +468,26 @@ async def decision_analyze(student: StudentInfo):
         employment = _build_employment_dict(emp_row, direction_tags)
 
         # 风险预警
-        cursor.execute(
-            "SELECT risk_type, risk_desc, severity, risk_source, risk_official, "
-            "data_confidence, year, direction_tags FROM risk_alerts WHERE uni_id=? AND major_category=? "
-            "ORDER BY year DESC, severity",
-            (uni_id, major))
-        risks = [{"type": r[0], "desc": r[1], "severity": r[2], "source": r[3],
-                  "official": bool(r[4]), "confidence": r[5], "year": r[6],
-                  "direction_tags": r[7].split(',') if r[7] else []} for r in cursor.fetchall()]
+        risks = _query_risk_alerts(cursor, uni_id, major)
+
+        # 自动检测位次波动风险（多年数据时）
+        years_count = rec.get("years_count", 1)
+        volatility = rec.get("volatility", 0)
+        if years_count >= 2 and volatility > 500:
+            severity = "high" if volatility > 1500 else "mid" if volatility > 800 else "low"
+            history = rec.get("min_rank_history") or {}
+            yrs = sorted(history.keys())
+            trend = " → ".join(f"{y}年{history[y]}名" for y in yrs)
+            risks.append({
+                "type": "录取波动",
+                "desc": f"近年最低位次跨度 {volatility} 名（{trend}）",
+                "severity": severity,
+                "source": "算法自动检测",
+                "official": False,
+                "confidence": "L2",
+                "year": rec.get("year_latest"),
+                "direction_tags": [],
+            })
 
         # 综合评分（位次匹配40% + 就业前景30% + 风险系数30%）
         prob = rec.get("admission_probability", 50)
@@ -541,10 +553,12 @@ async def decision_analyze(student: StudentInfo):
     wen = [r for r in enhanced if r["level"] == "稳"]
     bao = [r for r in enhanced if r["level"] == "保"]
 
-    avg_salary = None
-    salaries = [r["employment"]["avg_salary"] for r in enhanced if r.get("employment") and r["employment"].get("avg_salary")]
-    if salaries:
-        avg_salary = round(sum(salaries) / len(salaries))
+    salary_range_dist = {}
+    for r in enhanced:
+        emp = r.get("employment")
+        if emp and emp.get("salary_range"):
+            sr = emp["salary_range"]
+            salary_range_dist[sr] = salary_range_dist.get(sr, 0) + 1
 
     top_risks = []
     for r in enhanced:
@@ -560,7 +574,8 @@ async def decision_analyze(student: StudentInfo):
             "冲": len(chong),
             "稳": len(wen),
             "保": len(bao),
-            "avg_salary": avg_salary,
+            "avg_salary": None,
+            "salary_range_dist": salary_range_dist,
             "top_risks": top_risks[:5],
         }
     }
@@ -595,14 +610,7 @@ async def decision_compare(ids: List[str]):
             employment["year"] = None
 
         # 风险
-        cursor.execute(
-            "SELECT risk_type, risk_desc, severity, risk_source, risk_official, "
-            "data_confidence, year, direction_tags FROM risk_alerts WHERE uni_id=? AND major_category=? "
-            "ORDER BY year DESC, severity",
-            (uni_id, major))
-        risks = [{"type": r[0], "desc": r[1], "severity": r[2], "source": r[3],
-                  "official": bool(r[4]), "confidence": r[5], "year": r[6],
-                  "direction_tags": r[7].split(',') if r[7] else []} for r in cursor.fetchall()]
+        risks = _query_risk_alerts(cursor, uni_id, major)
 
         results.append({
             "uni_id": uni_id,
@@ -646,6 +654,7 @@ def convert_score_to_rank(score: int, year: Optional[int] = None) -> tuple:
     """
     分数转位次（基于数据库一分一段表）
     使用线性插值估算，返回 (rank, year_used)
+    若指定年份无数据，自动降级到最近可用年份
     """
     conn = get_connection()
     cursor = conn.cursor()
@@ -654,6 +663,14 @@ def convert_score_to_rank(score: int, year: Optional[int] = None) -> tuple:
         cursor.execute("SELECT MAX(year) FROM yunnan_physics_score_segments")
         row = cursor.fetchone()
         year = row[0] if row else 2025
+    else:
+        # 验证指定年份有数据；没有则用最近可用年份兜底
+        cursor.execute(
+            "SELECT COUNT(*) FROM yunnan_physics_score_segments WHERE year=?", (year,))
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("SELECT MAX(year) FROM yunnan_physics_score_segments")
+            row = cursor.fetchone()
+            year = row[0] if row else year
 
     # 精确匹配
     cursor.execute(
@@ -689,18 +706,19 @@ def convert_score_to_rank(score: int, year: Optional[int] = None) -> tuple:
         return higher['cumulative_count'], year
     return 5000, year
 
-def _query_major_outcomes(cursor, uni_id: str, major: str):
-    """查询就业数据：通过映射表找 Layer1，再查 major_outcomes"""
-    # 先通过映射表找 Layer1 大类
+def _resolve_layer1(cursor, major: str):
+    """通过 major_category_map 把推荐里的细分 major 映射为 Layer1 大类。无映射时返回原值。"""
     cursor.execute(
         "SELECT layer1, direction_tags FROM major_category_map WHERE original_category=?",
         (major,))
-    map_row = cursor.fetchone()
-    layer1 = major  # fallback: 用原值
-    direction_tags = None
-    if map_row:
-        layer1 = map_row[0]
-        direction_tags = map_row[1]
+    row = cursor.fetchone()
+    if row:
+        return row[0], row[1]
+    return major, None
+
+def _query_major_outcomes(cursor, uni_id: str, major: str):
+    """查询就业数据：通过映射表找 Layer1，再查 major_outcomes"""
+    layer1, direction_tags = _resolve_layer1(cursor, major)
 
     # 用 Layer1 查 major_outcomes
     cursor.execute(
@@ -724,6 +742,18 @@ def _query_major_outcomes(cursor, uni_id: str, major: str):
         (uni_id, layer1))
     row = cursor.fetchone()
     return row, direction_tags
+
+def _query_risk_alerts(cursor, uni_id: str, major: str):
+    """风险预警查询：用 Layer1 大类匹配，与就业数据使用同一映射"""
+    layer1, _ = _resolve_layer1(cursor, major)
+    cursor.execute(
+        "SELECT risk_type, risk_desc, severity, risk_source, risk_official, "
+        "data_confidence, year, direction_tags FROM risk_alerts "
+        "WHERE uni_id=? AND major_category=? ORDER BY year DESC, severity",
+        (uni_id, layer1))
+    return [{"type": r[0], "desc": r[1], "severity": r[2], "source": r[3],
+             "official": bool(r[4]), "confidence": r[5], "year": r[6],
+             "direction_tags": r[7].split(',') if r[7] else []} for r in cursor.fetchall()]
 
 def _build_employment_dict(row, direction_tags=None):
     """从 major_outcomes 行构建 employment dict"""
@@ -754,17 +784,7 @@ def calculate_recommendations(student: StudentInfo) -> List[RecommendationResult
     risk = student.risk_tolerance
 
     if not rank:
-        rank, _ = convert_score_to_rank(score)
-
-    # 确定查询年份
-    year = student.year
-    if year is None:
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT MAX(year) FROM yunnan_physics_scores")
-        row = cursor.fetchone()
-        year = row[0] if row else 2024
-        conn.close()
+        rank, _ = convert_score_to_rank(score, student.year)
 
     # 位次容差范围（位次越小=排名越高）
     # 冲：院校位次高于考生（位次数字更小），稳：院校位次接近考生，保：院校位次低于考生
@@ -779,113 +799,138 @@ def calculate_recommendations(student: StudentInfo) -> List[RecommendationResult
     wen_rank_min, wen_rank_max = tiers["稳"]
     bao_rank_min, bao_rank_max = tiers["保"]
 
-    # 查询数据库
     conn = get_connection()
     cursor = conn.cursor()
 
-    # 冲：院校位次高于考生（min_rank更小）
+    # 查询所有年份的录取数据，按 (university_id, major_category) 聚合
+    # 用最新年份作为代表行（用于显示分数等字段），但用平均位次做位次比对
     cursor.execute('''
-    SELECT s.*, u.level, u.province
+    SELECT
+        s.university_id,
+        s.university_name,
+        s.major_category,
+        u.level,
+        u.province,
+        AVG(s.min_rank * 1.0) AS rank_avg,
+        MIN(s.min_rank) AS rank_best,
+        MAX(s.min_rank) AS rank_worst,
+        COUNT(s.year) AS years_count,
+        MAX(s.year) AS year_latest
     FROM yunnan_physics_scores s
     JOIN universities u ON s.university_id = u.id
-    WHERE s.year = ? AND s.min_rank >= ? AND s.min_rank <= ?
-    ORDER BY s.min_rank ASC, s.enrollment_count DESC
-    LIMIT 20
-    ''', (year, chong_rank_min, chong_rank_max))
-    chong_majors = cursor.fetchall()
+    GROUP BY s.university_id, s.major_category
+    ''')
+    aggregated = cursor.fetchall()
 
-    # 稳：院校位次接近考生
+    # 同时取每条聚合记录最新一年的完整字段（min_score / max_score / avg_score / enrollment_count / major_code）
+    # 用一次性查询拉所有，再在 Python 里 join，避免 N+1
     cursor.execute('''
-    SELECT s.*, u.level, u.province
-    FROM yunnan_physics_scores s
-    JOIN universities u ON s.university_id = u.id
-    WHERE s.year = ? AND s.min_rank >= ? AND s.min_rank <= ?
-    ORDER BY ABS(s.min_rank - ?) ASC, s.enrollment_count DESC
-    LIMIT 30
-    ''', (year, wen_rank_min, wen_rank_max, rank))
-    wen_majors = cursor.fetchall()
+    SELECT s1.university_id, s1.major_category, s1.year,
+           s1.min_score, s1.max_score, s1.avg_score, s1.enrollment_count, s1.major_code
+    FROM yunnan_physics_scores s1
+    INNER JOIN (
+        SELECT university_id, major_category, MAX(year) AS max_year
+        FROM yunnan_physics_scores
+        GROUP BY university_id, major_category
+    ) s2 ON s1.university_id=s2.university_id
+        AND s1.major_category=s2.major_category
+        AND s1.year=s2.max_year
+    ''')
+    latest_map = {(r['university_id'], r['major_category']): dict(r) for r in cursor.fetchall()}
 
-    # 保：院校位次低于考生（min_rank更大）
+    # 拉取每个 (uni, major) 的全部年份位次，构建 history 字典
     cursor.execute('''
-    SELECT s.*, u.level, u.province
-    FROM yunnan_physics_scores s
-    JOIN universities u ON s.university_id = u.id
-    WHERE s.year = ? AND s.min_rank >= ? AND s.min_rank <= ?
-    ORDER BY s.min_rank DESC, s.enrollment_count DESC
-    LIMIT 20
-    ''', (year, bao_rank_min, bao_rank_max))
-    bao_majors = cursor.fetchall()
+    SELECT university_id, major_category, year, min_rank
+    FROM yunnan_physics_scores
+    ORDER BY year ASC
+    ''')
+    history_map = {}
+    for r in cursor.fetchall():
+        key = (r['university_id'], r['major_category'])
+        history_map.setdefault(key, {})[r['year']] = r['min_rank']
 
     conn.close()
 
-    # 生成推荐结果
+    # 把聚合行加工成候选记录
+    candidates = []
+    for r in aggregated:
+        key = (r['university_id'], r['major_category'])
+        latest = latest_map.get(key, {})
+        history = history_map.get(key, {})
+        volatility = (r['rank_worst'] - r['rank_best']) if r['years_count'] > 1 else 0
+        candidates.append({
+            "university_id": r['university_id'],
+            "university_name": r['university_name'],
+            "major_category": r['major_category'],
+            "major_code": latest.get('major_code', ''),
+            "level": r['level'],
+            "province": r['province'],
+            "min_rank_avg": int(r['rank_avg']) if r['rank_avg'] is not None else None,
+            "min_rank_best": r['rank_best'],
+            "min_rank_worst": r['rank_worst'],
+            "min_rank_latest": history.get(r['year_latest']),
+            "min_rank_history": history,
+            "year_latest": r['year_latest'],
+            "years_count": r['years_count'],
+            "volatility": volatility,
+            "min_score": latest.get('min_score'),
+            "max_score": latest.get('max_score'),
+            "avg_score": latest.get('avg_score'),
+            "enrollment_count": latest.get('enrollment_count'),
+        })
+
+    # 按平均位次分层
+    chong = [c for c in candidates if c["min_rank_avg"] is not None
+             and chong_rank_min <= c["min_rank_avg"] <= chong_rank_max]
+    chong.sort(key=lambda x: (x["min_rank_avg"], -(x["enrollment_count"] or 0)))
+
+    wen = [c for c in candidates if c["min_rank_avg"] is not None
+           and wen_rank_min <= c["min_rank_avg"] <= wen_rank_max]
+    wen.sort(key=lambda x: (abs(x["min_rank_avg"] - rank), -(x["enrollment_count"] or 0)))
+
+    bao = [c for c in candidates if c["min_rank_avg"] is not None
+           and bao_rank_min <= c["min_rank_avg"] <= bao_rank_max]
+    bao.sort(key=lambda x: (-x["min_rank_avg"], -(x["enrollment_count"] or 0)))
+
+    def build_rec(cand, level, prob, order):
+        return {
+            "level": level,
+            "university_name": cand['university_name'],
+            "university_id": cand['university_id'],
+            "major": cand['major_category'],
+            "major_code": cand.get('major_code', ''),
+            "min_score": cand.get('min_score'),
+            "min_rank": cand.get('min_rank_avg'),
+            "min_rank_latest": cand.get('min_rank_latest'),
+            "min_rank_history": cand.get('min_rank_history', {}),
+            "min_rank_best": cand.get('min_rank_best'),
+            "min_rank_worst": cand.get('min_rank_worst'),
+            "volatility": cand.get('volatility', 0),
+            "years_count": cand.get('years_count', 1),
+            "max_score": cand.get('max_score'),
+            "avg_score": cand.get('avg_score'),
+            "enrollment_count": cand.get('enrollment_count'),
+            "admission_probability": round(prob, 1),
+            "suggested_order": order,
+            "school_level": cand.get('level', ''),
+        }
+
     recommendations = []
     order = 1
-
-    # 冲刺层（4个）
-    for row in chong_majors[:4]:
-        major = dict(row)
-        rank_diff = rank - major['min_rank']  # 正值=考生位次更高(数字更小)
-        prob = max(15, min(45, 45 - abs(rank_diff) / 10))
-        recommendations.append({
-            "level": "冲",
-            "university_name": major['university_name'],
-            "university_id": major['university_id'],
-            "major": major['major_category'],
-            "major_code": major.get('major_code', ''),
-            "min_score": major['min_score'],
-            "min_rank": major.get('min_rank'),
-            "max_score": major.get('max_score'),
-            "avg_score": major.get('avg_score'),
-            "enrollment_count": major.get('enrollment_count'),
-            "admission_probability": round(prob, 1),
-            "suggested_order": order,
-            "school_level": major.get('level', '')
-        })
+    for cand in chong[:4]:
+        rank_diff = abs(rank - cand["min_rank_avg"])
+        prob = max(15, min(45, 45 - rank_diff / 10))
+        recommendations.append(build_rec(cand, "冲", prob, order))
         order += 1
-
-    # 稳妥层（10个）
-    for row in wen_majors[:10]:
-        major = dict(row)
-        rank_diff = abs(rank - major['min_rank'])
+    for cand in wen[:10]:
+        rank_diff = abs(rank - cand["min_rank_avg"])
         prob = max(50, min(85, 85 - rank_diff / 10))
-        recommendations.append({
-            "level": "稳",
-            "university_name": major['university_name'],
-            "university_id": major['university_id'],
-            "major": major['major_category'],
-            "major_code": major.get('major_code', ''),
-            "min_score": major['min_score'],
-            "min_rank": major.get('min_rank'),
-            "max_score": major.get('max_score'),
-            "avg_score": major.get('avg_score'),
-            "enrollment_count": major.get('enrollment_count'),
-            "admission_probability": round(prob, 1),
-            "suggested_order": order,
-            "school_level": major.get('level', '')
-        })
+        recommendations.append(build_rec(cand, "稳", prob, order))
         order += 1
-
-    # 保底层（6个）
-    for row in bao_majors[:6]:
-        major = dict(row)
-        rank_diff = major['min_rank'] - rank  # 正值=院校位次更低(数字更大)
+    for cand in bao[:6]:
+        rank_diff = cand["min_rank_avg"] - rank
         prob = max(90, min(98, 90 + rank_diff / 20))
-        recommendations.append({
-            "level": "保",
-            "university_name": major['university_name'],
-            "university_id": major['university_id'],
-            "major": major['major_category'],
-            "major_code": major.get('major_code', ''),
-            "min_score": major['min_score'],
-            "min_rank": major.get('min_rank'),
-            "max_score": major.get('max_score'),
-            "avg_score": major.get('avg_score'),
-            "enrollment_count": major.get('enrollment_count'),
-            "admission_probability": round(prob, 1),
-            "suggested_order": order,
-            "school_level": major.get('level', '')
-        })
+        recommendations.append(build_rec(cand, "保", prob, order))
         order += 1
 
     return recommendations

@@ -3,23 +3,48 @@ import { Form, InputNumber, Select, Checkbox, Button, Row, Col, Card, message } 
 
 const { Option } = Select;
 
+const LAYER1_CATEGORIES = [
+  '计算机类', '电子信息类', '半导体类', '自动化类', '电气类',
+  '机械类', '材料类', '能源动力类', '航空航天类', '土木类',
+  '化学化工类', '交通运输类', '海洋类', '力学类',
+  '数学类', '物理类', '生物类', '环境类', '天文地理类',
+  '医学类', '经济管理类', '法学类', '心理学',
+];
+
 const StudentForm = ({ onSubmit }) => {
   const [form] = Form.useForm();
   const [computedRank, setComputedRank] = useState(null);
+  const [yearUsed, setYearUsed] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const onScoreChange = async (score) => {
+  const recomputeRank = async (score, year) => {
     if (!score || score < 400) {
       setComputedRank(null);
+      setYearUsed(null);
       return;
     }
     try {
-      const resp = await fetch(`/api/score-conversion?score=${score}`);
+      const url = year
+        ? `/api/score-conversion?score=${score}&year=${year}`
+        : `/api/score-conversion?score=${score}`;
+      const resp = await fetch(url);
       const data = await resp.json();
       setComputedRank(data.estimated_rank);
+      setYearUsed(data.year_used);
     } catch {
       setComputedRank(null);
+      setYearUsed(null);
     }
+  };
+
+  const onScoreChange = (score) => {
+    const year = form.getFieldValue('year');
+    recomputeRank(score, year);
+  };
+
+  const onYearChange = (year) => {
+    const score = form.getFieldValue('score');
+    recomputeRank(score, year);
   };
 
   const onFinish = (values) => {
@@ -40,7 +65,7 @@ const StudentForm = ({ onSubmit }) => {
         initialValues={{
           subjects: ['物理', '化学', '生物'],
           risk_tolerance: '稳健',
-          year: 2025
+          year: 2026
         }}
       >
         <Row gutter={24}>
@@ -61,7 +86,7 @@ const StudentForm = ({ onSubmit }) => {
           </Col>
 
           <Col span={12}>
-            <Form.Item label="全省位次（自动计算）">
+            <Form.Item label={yearUsed ? `全省位次（基于 ${yearUsed} 年一分一段表）` : '全省位次（自动计算）'}>
               <InputNumber
                 style={{ width: '100%' }}
                 value={computedRank}
@@ -74,10 +99,11 @@ const StudentForm = ({ onSubmit }) => {
 
         <Row gutter={24}>
           <Col xs={24} sm={12}>
-            <Form.Item name="year" label="参考年份" rules={[{ required: true }]}>
-              <Select>
+            <Form.Item name="year" label="考生年份（决定一分一段表）" rules={[{ required: true }]}>
+              <Select onChange={onYearChange}>
                 <Option value={2024}>2024年</Option>
                 <Option value={2025}>2025年</Option>
+                <Option value={2026}>2026年</Option>
               </Select>
             </Form.Item>
           </Col>
@@ -115,9 +141,9 @@ const StudentForm = ({ onSubmit }) => {
 
         <Form.Item
           name="preference_region"
-          label="偏好地区（可多选）"
+          label="偏好地区（可多选，留空表示不限）"
         >
-          <Select mode="multiple" placeholder="选择您偏好的地区">
+          <Select mode="multiple" placeholder="选择您偏好的地区，留空表示不限" allowClear>
             <Option value="北京">北京</Option>
             <Option value="上海">上海</Option>
             <Option value="江苏">江苏</Option>
@@ -126,23 +152,26 @@ const StudentForm = ({ onSubmit }) => {
             <Option value="四川">四川</Option>
             <Option value="陕西">陕西</Option>
             <Option value="湖北">湖北</Option>
-            <Option value="其他">其他</Option>
+            <Option value="天津">天津</Option>
+            <Option value="重庆">重庆</Option>
+            <Option value="湖南">湖南</Option>
+            <Option value="福建">福建</Option>
+            <Option value="安徽">安徽</Option>
+            <Option value="山东">山东</Option>
+            <Option value="辽宁">辽宁</Option>
+            <Option value="黑龙江">黑龙江</Option>
+            <Option value="吉林">吉林</Option>
           </Select>
         </Form.Item>
 
         <Form.Item
           name="preference_major"
-          label="偏好专业（可多选）"
+          label="偏好专业大类（可多选，按 Layer 1 大类匹配）"
         >
-          <Select mode="multiple" placeholder="选择您偏好的专业类型">
-            <Option value="计算机">计算机科学与技术</Option>
-            <Option value="软件工程">软件工程</Option>
-            <Option value="人工智能">人工智能</Option>
-            <Option value="电子信息">电子信息工程</Option>
-            <Option value="微电子">微电子科学与工程</Option>
-            <Option value="自动化">自动化</Option>
-            <Option value="数学">数学与应用数学</Option>
-            <Option value="物理">物理学</Option>
+          <Select mode="multiple" placeholder="选择您偏好的专业大类，留空表示不限" allowClear>
+            {LAYER1_CATEGORIES.map(c => (
+              <Option key={c} value={c}>{c}</Option>
+            ))}
           </Select>
         </Form.Item>
 

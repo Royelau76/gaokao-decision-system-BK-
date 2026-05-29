@@ -143,16 +143,20 @@ function SimulatorPage() {
 
   async function handleStudentSubmit(values) {
     try {
-      const response = await fetch('/api/recommendations', {
+      const response = await fetch('/api/decision/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(values),
       });
       const data = await response.json();
+      if (data.status !== 'success') {
+        message.error('生成推荐失败');
+        return;
+      }
       setStudentInfo(values);
       setRecommendations(data.recommendations);
       setCurrentStep(1);
-      message.success('推荐生成成功！');
+      message.success(`推荐生成成功！冲${data.summary.冲} · 稳${data.summary.稳} · 保${data.summary.保}`);
     } catch (error) {
       message.error('生成推荐失败：' + error.message);
     }
